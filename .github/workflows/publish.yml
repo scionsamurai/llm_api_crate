@@ -28,9 +28,9 @@ jobs:
         id: get_previous_cargo_toml
         run: |
           if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
-            previous_cargo_toml_contents=$(git show HEAD^1:Cargo.toml)
+            previous_cargo_toml_contents=$(git show HEAD^1:Cargo.toml --no-patch)
           else
-            previous_cargo_toml_contents=$(git show "${{ github.event.before }}":Cargo.toml)
+            previous_cargo_toml_contents=$(git show "${{ github.event.before }}":Cargo.toml --no-patch)
           fi
           echo "::set-output name=previous_cargo_toml_contents::$previous_cargo_toml_contents"
 
@@ -43,8 +43,8 @@ jobs:
           echo "$current_cargo_toml_contents"
           echo "Previous Cargo.toml contents:"
           echo "$previous_cargo_toml_contents"
-          current_version=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)
-          previous_version=$(grep -oE 'version = "[^"]+"' <(echo "$previous_cargo_toml_contents") | cut -d '"' -f 2)
+          current_version=$(echo "$current_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
+          previous_version=$(echo "$previous_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
           echo "Current version: $current_version"
           echo "Previous version: $previous_version"
           echo "::set-output name=current_version::$current_version"
