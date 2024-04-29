@@ -31,7 +31,7 @@ jobs:
           else
             previous_cargo_toml_contents=$(git cat-file -p "${{ github.event.before }}":Cargo.toml)
           fi
-          echo "${previous_cargo_toml_contents}" >> $GITHUB_STATE
+          echo "${previous_cargo_toml_contents}" > $GITHUB_STATE
 
       - name: Extract version numbers
         run: |
