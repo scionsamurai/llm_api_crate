@@ -2,9 +2,7 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 name: Publish
 
@@ -16,7 +14,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3
         with:
-          fetch-depth: 2
+          fetch-depth: 2 # Fetch the previous commit to compare with
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -25,29 +23,17 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Get previous Cargo.toml contents
-        id: get_previous_cargo_toml
+      - name: Get Cargo.toml versions
+        id: get_versions
         run: |
-          if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
-            previous_cargo_toml_contents=$(git show HEAD^1:Cargo.toml)
-          else
-            previous_cargo_toml_contents=$(git show "${{ github.event.before }}":Cargo.toml)
-          fi
-          echo "previous_cargo_toml_contents=$previous_cargo_toml_contents" >> $GITHUB_OUTPUT
-
-      - name: Extract version numbers
-        id: extract_versions
-        run: |
-          current_cargo_toml_contents=$(cat Cargo.toml)
-          previous_cargo_toml_contents="${{ steps.get_previous_cargo_toml.outputs.previous_cargo_toml_contents }}"
-          current_version=$(echo "$current_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
-          previous_version=$(echo "$previous_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
-          echo "current_version=$current_version" >> $GITHUB_OUTPUT
-          echo "previous_version=$previous_version" >> $GITHUB_OUTPUT
+          current_version=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)
+          previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
+          echo "::set-output name=current_version::$current_version"
+          echo "::set-output name=previous_version::$previous_version"
 
       - name: Compare version numbers
         run: |
-          if [[ "${{ steps.extract_versions.outputs.current_version }}" != "${{ steps.extract_versions.outputs.previous_version }}" ]]; then
+          if [[ "${{ steps.get_versions.outputs.current_version }}" != "${{ steps.get_versions.outputs.previous_version }}" ]]; then
             echo "Version changed!"
           else
             echo "Version unchanged."
