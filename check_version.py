@@ -10,8 +10,15 @@ cargo_toml_path = os.path.join(current_dir, 'Cargo.toml')
 with open(cargo_toml_path, 'r') as f:
     current_contents = f.read()
 
+# Check out the previous commit temporarily
+os.system('git checkout HEAD~1')
+
 # Read the Cargo.toml file from the previous commit
-previous_contents = os.popen('git show HEAD~1:' + cargo_toml_path).read()
+with open(cargo_toml_path, 'r') as f:
+    previous_contents = f.read()
+
+# Check out the current commit again
+os.system('git checkout -')
 
 # Extract the version numbers from the files
 current_version = current_contents.split('version = "')[1].split('"')[0]

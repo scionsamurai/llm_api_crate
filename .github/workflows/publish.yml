@@ -1,8 +1,11 @@
 on:
   push:
+    branches:
+      - main
     paths:
       - 'Cargo.toml'
   workflow_dispatch:
+
 
 name: Publish
 
