@@ -2,8 +2,9 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
-
+  pull_request:
+    branches:
+      - main
 
 name: Publish
 
@@ -25,31 +26,28 @@ jobs:
           override: true
 
       - name: Get previous Cargo.toml contents
+        id: get_previous_cargo_toml
         run: |
-          if [[ "${{ github.event_name }}" == 'push' ]]; then
-            git cat-file -p HEAD^1:Cargo.toml > $GITHUB_STATE
+          if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+            previous_cargo_toml_contents=$(git show HEAD^1:Cargo.toml)
           else
-            git cat-file -p "${{ github.event.before }}":Cargo.toml > $GITHUB_STATE
+            previous_cargo_toml_contents=$(git show "${{ github.event.before }}":Cargo.toml)
           fi
+          echo "previous_cargo_toml_contents=$previous_cargo_toml_contents" >> $GITHUB_OUTPUT
 
       - name: Extract version numbers
+        id: extract_versions
         run: |
           current_cargo_toml_contents=$(cat Cargo.toml)
-          previous_cargo_toml_contents=$(cat $GITHUB_STATE)
-          echo "Current Cargo.toml contents:"
-          echo "$current_cargo_toml_contents"
-          echo "Previous Cargo.toml contents:"
-          echo "$previous_cargo_toml_contents"
+          previous_cargo_toml_contents="${{ steps.get_previous_cargo_toml.outputs.previous_cargo_toml_contents }}"
           current_version=$(echo "$current_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
           previous_version=$(echo "$previous_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
-          echo "Current version: $current_version"
-          echo "Previous version: $previous_version"
           echo "current_version=$current_version" >> $GITHUB_OUTPUT
           echo "previous_version=$previous_version" >> $GITHUB_OUTPUT
 
       - name: Compare version numbers
         run: |
-          if [[ "${{ env.current_version }}" != "${{ env.previous_version }}" ]]; then
+          if [[ "${{ steps.extract_versions.outputs.current_version }}" != "${{ steps.extract_versions.outputs.previous_version }}" ]]; then
             echo "Version changed!"
           else
             echo "Version unchanged."
