@@ -16,13 +16,6 @@ jobs:
         with:
           fetch-depth: 2 # Fetch the previous commit to compare with
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
       - name: Get Cargo.toml versions
         id: get_versions
         run: |
@@ -32,9 +25,28 @@ jobs:
           echo "::set-output name=previous_version::$previous_version"
 
       - name: Compare version numbers
+        id: compare_versions
         run: |
           if [[ "${{ steps.get_versions.outputs.current_version }}" != "${{ steps.get_versions.outputs.previous_version }}" ]]; then
             echo "Version changed!"
+            echo "::set-output name=version_changed::true"
           else
             echo "Version unchanged."
+            echo "::set-output name=version_changed::false"
           fi
+
+      # Run additional tasks if version changed
+      - name: Install stable toolchain (for publishing)
+        if: steps.compare_versions.outputs.version_changed == 'true'
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Publish
+        if: steps.compare_versions.outputs.version_changed == 'true'
+        run: |
+          cargo publish --token ${CRATES_TOKEN}
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
