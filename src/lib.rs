@@ -4,7 +4,8 @@ use std::env;
 use reqwest::header::{HeaderMap, HeaderValue};
 use async_trait::async_trait;
 
-mod structs;
+pub mod structs;
+
 use crate::structs::{
     APIResponse, ChatCompletion, Content, CountTokensRequest, CountTokensResponse, GeminiError,
     GeminiRequest, GeminiResponse, ListModelsResponse, Message, ModelInfo, Part, TokenCountContent,
