@@ -10,6 +10,9 @@ cargo_toml_path = os.path.join(current_dir, 'Cargo.toml')
 with open(cargo_toml_path, 'r') as f:
     current_contents = f.read()
 
+print("Current Cargo.toml contents:")
+print(current_contents)
+
 # Get the path to the previous version of the Cargo.toml file
 previous_cargo_toml_path = os.path.join(current_dir, '..', 'Cargo.toml')
 
@@ -20,6 +23,9 @@ if os.path.exists(previous_cargo_toml_path):
 else:
     # If there's no previous version of the file, set previous_contents to an empty string
     previous_contents = ''
+
+print("Previous Cargo.toml contents:")
+print(previous_contents)
 
 # Extract the version numbers from the files
 current_version = current_contents.split('version = "')[1].split('"')[0]
