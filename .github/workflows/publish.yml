@@ -38,8 +38,15 @@ jobs:
         id: extract_versions
         run: |
           current_cargo_toml_contents=$(cat Cargo.toml)
+          previous_cargo_toml_contents="${{ steps.get_previous_cargo_toml.outputs.previous_cargo_toml_contents }}"
+          echo "Current Cargo.toml contents:"
+          echo "$current_cargo_toml_contents"
+          echo "Previous Cargo.toml contents:"
+          echo "$previous_cargo_toml_contents"
           current_version=$(echo "$current_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
-          previous_version=$(echo "${{ steps.get_previous_cargo_toml.outputs.previous_cargo_toml_contents }}" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
+          previous_version=$(echo "$previous_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
+          echo "Current version: $current_version"
+          echo "Previous version: $previous_version"
           echo "::set-output name=current_version::$current_version"
           echo "::set-output name=previous_version::$previous_version"
 
