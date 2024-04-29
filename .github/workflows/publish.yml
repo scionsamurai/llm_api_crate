@@ -27,11 +27,10 @@ jobs:
       - name: Get previous Cargo.toml contents
         run: |
           if [[ "${{ github.event_name }}" == 'push' ]]; then
-            previous_cargo_toml_contents=$(git cat-file -p HEAD^1:Cargo.toml)
+            git cat-file -p HEAD^1:Cargo.toml > $GITHUB_STATE
           else
-            previous_cargo_toml_contents=$(git cat-file -p "${{ github.event.before }}":Cargo.toml)
+            git cat-file -p "${{ github.event.before }}":Cargo.toml > $GITHUB_STATE
           fi
-          echo "${previous_cargo_toml_contents}" > $GITHUB_STATE
 
       - name: Extract version numbers
         run: |
