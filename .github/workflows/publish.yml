@@ -28,9 +28,9 @@ jobs:
         id: get_previous_cargo_toml
         run: |
           if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
-            previous_cargo_toml_contents=$(git show HEAD^1:Cargo.toml --no-patch --no-notes --no-color)
+            previous_cargo_toml_contents=$(git cat-file -p HEAD^1:Cargo.toml)
           else
-            previous_cargo_toml_contents=$(git show "${{ github.event.before }}":Cargo.toml --no-patch --no-notes --no-color)
+            previous_cargo_toml_contents=$(git cat-file -p "${{ github.event.before }}:Cargo.toml")
           fi
           echo "::set-output name=previous_cargo_toml_contents::$previous_cargo_toml_contents"
 
