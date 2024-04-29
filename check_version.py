@@ -1,10 +1,10 @@
 import os
 
-# Get the path to the directory containing the script
-script_dir = os.path.dirname(os.path.abspath(__file__))
+# Get the path to the current working directory
+current_dir = os.getcwd()
 
 # Construct the path to the Cargo.toml file
-cargo_toml_path = os.path.join(script_dir, '..', '..', 'Cargo.toml')
+cargo_toml_path = os.path.join(current_dir, 'Cargo.toml')
 
 # Read the current Cargo.toml file
 with open(cargo_toml_path, 'r') as f:
