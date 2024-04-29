@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
-          fetch-depth: 0
-          
+          fetch-depth: 2
+
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -24,14 +24,29 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Check if version has changed
-        id: check_version
+      - name: Get previous Cargo.toml contents
+        id: get_previous_cargo_toml
         run: |
-          python check_version.py
+          if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+            previous_cargo_toml_contents=$(git show HEAD^1:Cargo.toml)
+          else
+            previous_cargo_toml_contents=$(git show "${{ github.event.before }}":Cargo.toml)
+          fi
+          echo "::set-output name=previous_cargo_toml_contents::$previous_cargo_toml_contents"
 
-      - name: Publish if version changed
-        if: steps.check_version.outputs.version_changed == 'true'
+      - name: Extract version numbers
+        id: extract_versions
         run: |
-          cargo publish --token ${CRATES_TOKEN}
-        env:
-          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+          current_cargo_toml_contents=$(cat Cargo.toml)
+          current_version=$(echo "$current_cargo_toml_contents" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
+          previous_version=$(echo "${{ steps.get_previous_cargo_toml.outputs.previous_cargo_toml_contents }}" | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
+          echo "::set-output name=current_version::$current_version"
+          echo "::set-output name=previous_version::$previous_version"
+
+      - name: Compare version numbers
+        run: |
+          if [[ "${{ steps.extract_versions.outputs.current_version }}" != "${{ steps.extract_versions.outputs.previous_version }}" ]]; then
+            echo "Version changed!"
+          else
+            echo "Version unchanged."
+          fi
