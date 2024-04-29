@@ -1,8 +1,7 @@
 on:
   push:
-    # Pattern matched against refs/tags
-    tags:        
-      - '*'           # Push events to every tag not containing /
+    paths:
+      - 'Cargo.toml'
   workflow_dispatch:
 
 name: Publish
@@ -22,6 +21,14 @@ jobs:
           toolchain: stable
           override: true
 
-      - run: cargo publish --token ${CRATES_TOKEN}
+      - name: Check if version has changed
+        id: check_version
+        run: |
+          python check_version.py
+
+      - name: Publish if version changed
+        if: steps.check_version.outputs.version_changed == 'true'
+        run: |
+          cargo publish --token ${CRATES_TOKEN}
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
