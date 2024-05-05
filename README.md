@@ -1,5 +1,3 @@
-## llm_api_access Crate
-
 The `llm_api_access` crate provides a unified way to interact with different large language models (LLMs) like OpenAI, Gemini, and Anthropic.
 
 ### LLM Enum
@@ -74,21 +72,36 @@ This example creates an instance of the `LLM::OpenAI` provider and sends a singl
 ### `send_convo_message` Example
 
 ```rust
-// ... (assuming llm_api_access crate is imported)
+use llm::{LLM, Access, Message};
 
-// Create a Gemini LLM provider instance
-let llm = LLM::Gemini;
+#[tokio::main]
+async fn main() {
+    // Create an instance of the Gemini LLM
+    let llm = LLM::Gemini;
 
-// Define conversation messages
-let messages = vec![
-    Message { content: Content::Text("Hi! Can you write a Python function to greet someone?".to_string()) },
-    Message { content: Content::Text("Sure, here's an example:".to_string()) },
-];
+    // Define the conversation messages
+    let messages = vec![
+        Message {
+            role: "user".to_string(),
+            content: "You are a helpful coding assistant.".to_string(),
+        },
+        Message {
+            role: "model".to_string(),
+            content: "You got it! I am ready to assist!".to_string(),
+        },
+        Message {
+            role: "user".to_string(),
+            content: "Generate a rust function that reverses a string.".to_string(),
+        },
+    ];
 
-// Send the conversation and handle response
-match llm.send_convo_message(messages) {
-    Ok(response) => println!("{}", response),
-    Err(err) => println!("Error: {}", err),
+    // Send the conversation messages to the LLM
+    let response = llm.send_convo_message(messages).await;
+
+    match response {
+        Ok(code) => println!("Code: {}", code),
+        Err(err) => eprintln!("Error: {}", err),
+    }
 }
 ```
 
@@ -97,17 +110,3 @@ match llm.send_convo_message(messages) {
 ## Testing
 
 The `llm_api_access` crate includes unit tests for various methods in the `Access` trait. These tests showcase usage and expected behavior with different LLM providers.
-
-**Requirements:** To run the tests, you'll need the necessary API keys and configuration set up for the respective LLM providers.
-
-## Dependencies
-
-The `llm_api_access` crate depends on several other crates:
-
-- `async_trait`: Provides the `async_trait` macro for defining asynchronous traits.
-- `llm::openai`: Provides functions for interacting with the OpenAI LLM.
-- `llm::gemini`: Provides functions for interacting with the Gemini LLM (calling, conversation flow, model info, model listing, token counting).
-- `llm::anthropic`: Provides functions for interacting with the Anthropic LLM.
-- `llm::models`: Provides the `ModelInfo` struct for representing model information.
-- `llm::errors`: Provides the `GeminiError` struct for handling errors.
-- `llm::structs`: Provides structs for representing messages and content (`Message`, `Content`, `Part`).
