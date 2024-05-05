@@ -6,6 +6,8 @@ use dotenv::dotenv;
 
 use crate::structs::Message;
 
+// https://docs.anthropic.com/claude/reference/getting-started-with-the-api
+
 #[derive(Debug, Serialize, Clone)]
 pub struct AnthropicRequest {
     pub model: String,
