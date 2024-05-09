@@ -4,7 +4,7 @@ use reqwest::Client;
 use std::env;
 use dotenv::dotenv;
 
-use crate::errors::GeminiError;
+use crate::errors::GeneralError;
 use crate::models::{ListModelsResponse, ModelInfo};
 use crate::token_count::{CountTokensRequest, CountTokensResponse, TokenCountContent, TokenCountPart};
 use crate::structs::{ Message, Content, Part };
@@ -47,7 +47,7 @@ pub async fn call_gemini(
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
 
-    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeminiError {
+    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GEMINI API KEY not found in environment variables".to_string(),
     })?;
 
@@ -75,14 +75,14 @@ pub async fn call_gemini(
         .await
         .map_err(|e| {
             println!("{:?}", e);
-            Box::new(GeminiError {
+            Box::new(GeneralError {
                 message: format!("Failed to send request to Gemini API: {}", e.to_string()),
             }) as Box<dyn std::error::Error + Send + Sync>
         })?;
 
     let rspns_strng = res.text().await.map_err(|e: reqwest::Error| {
         println!("------------d------------------{:?}", e);
-        Box::new(GeminiError {
+        Box::new(GeneralError {
             message: format!("Failed to read response from Gemini API: {}", e.to_string()),
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;
@@ -91,7 +91,7 @@ pub async fn call_gemini(
 
     let res: GeminiResponse = serde_json::from_str(&rspns_strng).map_err(|e| {
         println!("{:?}", e);
-        Box::new(GeminiError {
+        Box::new(GeneralError {
             message: format!(
                 "Failed to parse response from Gemini API: {}",
                 e.to_string()
@@ -102,12 +102,36 @@ pub async fn call_gemini(
     Ok(res.candidates[0].content.parts[0].text.clone())
 }
 
+#[derive(Deserialize, Debug)]
+struct GeminiErrorResponse {
+    error: GeminiError,
+}
+
+#[allow(dead_code)] 
+#[derive(Deserialize, Debug)]
+struct GeminiError {
+    code: u16,
+    message: String,
+    status: String,
+    details: Vec<GeminiErrorDetail>,
+}
+
+#[allow(dead_code)] 
+#[derive(Deserialize, Debug)]
+struct GeminiErrorDetail {
+    #[serde(rename = "@type")]
+    type_: String,
+    reason: String,
+    domain: String,
+    metadata: std::collections::HashMap<String, String>,
+}
+
 pub async fn conversation_gemini_call(
     messages: Vec<Content>,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
 
-    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeminiError {
+    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GOOGLE API KEY not found in environment variables".to_string(),
     })?;
 
@@ -121,30 +145,53 @@ pub async fn conversation_gemini_call(
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", HeaderValue::from_static("application/json"));
 
-    let res: GeminiResponse = client
+    let res = client
         .post(&format!("{}?key={}", url, api_key))
         .headers(headers)
         .json(&request)
         .send()
         .await
         .map_err(|e| {
-            Box::new(GeminiError {
+            Box::new(GeneralError {
                 message: format!("Failed to send request to Gemini API: {}", e.to_string()),
             }) as Box<dyn std::error::Error + Send + Sync>
-        })?
-        .json()
-        .await
-        .map_err(|e| {
-            Box::new(GeminiError {
-                message: format!(
-                    "Failed to parse response from Gemini API: {}",
-                    e.to_string()
-                ),
-            }) as Box<dyn std::error::Error + Send + Sync>
         })?;
-    // println!("{:?}", res);
 
-    Ok(res.candidates[0].content.parts[0].text.clone())
+    let response_body = res.text().await.map_err(|e| {
+        Box::new(GeneralError {
+            message: format!("Failed to read response from Gemini API: {}", e.to_string()),
+        }) as Box<dyn std::error::Error + Send + Sync>
+    })?;
+
+    // Try to parse the response as a GeminiResponse
+    let gemini_response: Result<GeminiResponse, _> = serde_json::from_str(&response_body).map_err(|_| {
+        Box::new(GeneralError {
+            message: "Failed to parse response from Gemini API".to_string(),
+        }) as Box<dyn std::error::Error + Send + Sync>
+    });
+
+    match gemini_response {
+        Ok(response) => Ok(response.candidates[0].content.parts[0].text.clone()),
+        Err(_) => {
+            // Try to parse the response as a GeminiErrorResponse
+            let error_response: Result<GeminiErrorResponse, _> =
+                serde_json::from_str(&response_body).map_err(|e| {
+                    Box::new(GeneralError {
+                        message: format!(
+                            "Failed to parse error response from Gemini API: {}",
+                            e.to_string()
+                        ),
+                    }) as Box<dyn std::error::Error + Send + Sync>
+                });
+
+            match error_response {
+                Ok(err) => Err(Box::new(GeneralError {
+                    message: format!("Gemini API Error: {}", err.error.message),
+                }) as Box<dyn std::error::Error + Send + Sync>),
+                Err(e) => Err(e),
+            }
+        }
+    }
 }
 
 pub async fn get_gemini_model_info(
@@ -152,7 +199,7 @@ pub async fn get_gemini_model_info(
 ) -> Result<ModelInfo, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
 
-    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeminiError {
+    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GOOGLE API KEY not found in environment variables".to_string(),
     })?;
 
@@ -168,14 +215,14 @@ pub async fn get_gemini_model_info(
         .send()
         .await
         .map_err(|e| {
-            Box::new(GeminiError {
+            Box::new(GeneralError {
                 message: format!("Failed to send request to Gemini API: {}", e.to_string()),
             }) as Box<dyn std::error::Error + Send + Sync>
         })?
         .json()
         .await
         .map_err(|e| {
-            Box::new(GeminiError {
+            Box::new(GeneralError {
                 message: format!(
                     "Failed to parse response from Gemini API: {}",
                     e.to_string()
@@ -189,7 +236,7 @@ pub async fn list_gemini_models() -> Result<Vec<ModelInfo>, Box<dyn std::error::
 {
     dotenv().ok();
 
-    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeminiError {
+    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GOOGLE API KEY not found in environment variables".to_string(),
     })?;
 
@@ -202,14 +249,14 @@ pub async fn list_gemini_models() -> Result<Vec<ModelInfo>, Box<dyn std::error::
         .send()
         .await
         .map_err(|e| {
-            Box::new(GeminiError {
+            Box::new(GeneralError {
                 message: format!("Failed to send request to Gemini API: {}", e.to_string()),
             }) as Box<dyn std::error::Error + Send + Sync>
         })?
         .json()
         .await
         .map_err(|e| {
-            Box::new(GeminiError {
+            Box::new(GeneralError {
                 message: format!(
                     "Failed to parse response from Gemini API: {}",
                     e.to_string()
@@ -225,7 +272,7 @@ pub async fn count_gemini_tokens(
 ) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
 
-    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeminiError {
+    let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GOOGLE API KEY not found in environment variables".to_string(),
     })?;
 
@@ -253,14 +300,14 @@ pub async fn count_gemini_tokens(
         .await
         .map_err(|e| {
             println!("------------------------------{:?}", e);
-            Box::new(GeminiError {
+            Box::new(GeneralError {
                 message: format!("Failed to send request to Gemini API: {}", e.to_string()),
             }) as Box<dyn std::error::Error + Send + Sync>
         })?;
 
     let rspns_strng = res.text().await.map_err(|e: reqwest::Error| {
         println!("------------d------------------{:?}", e);
-        Box::new(GeminiError {
+        Box::new(GeneralError {
             message: format!("Failed to read response from Gemini API: {}", e.to_string()),
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;

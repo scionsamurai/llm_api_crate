@@ -12,6 +12,6 @@ pub use openai::{APIChoice, APIMessage, APIResponse, ChatCompletion};
 pub use gemini::{
     Candidate, GeminiRequest, GeminiResponse, PromptFeedback, SafetyRating,
 };
-pub use errors::GeminiError;
+pub use errors::GeneralError;
 pub use models::{ListModelsResponse, ModelInfo};
 pub use token_count::{CountTokensRequest, CountTokensResponse, TokenCountContent, TokenCountPart};

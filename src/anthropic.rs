@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::Client;
 use std::env;
+use crate::errors::GeneralError;
 use dotenv::dotenv;
 
 use crate::structs::Message;
@@ -49,7 +50,7 @@ pub async fn call_anthropic(
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
 
-    let api_key: String = env::var("ANTHROPIC_API_KEY").map_err(|_| AnthropicError {
+    let api_key: String = env::var("ANTHROPIC_API_KEY").map_err(|_| GeneralError {
         message: "ANTHROPIC API KEY not found in environment variables".to_string(),
     })?;
 
@@ -60,25 +61,41 @@ pub async fn call_anthropic(
     headers.insert(
         "x-api-key",
         HeaderValue::from_str(&api_key)
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
+            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+                Box::new(GeneralError {
+                    message: format!("Invalid Anthropic API key: {}", e.to_string()),
+                })
+            })?,
     );
 
     headers.insert(
         "anthropic-version",
         HeaderValue::from_str("2023-06-01")
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
+            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+                Box::new(GeneralError {
+                    message: format!("Failed to set Anthropic version header: {}", e.to_string()),
+                })
+            })?,
     );
 
     headers.insert(
         "content-type",
         HeaderValue::from_str("application/json")
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
+            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+                Box::new(GeneralError {
+                    message: format!("Failed to set content-type header: {}", e.to_string()),
+                })
+            })?,
     );
 
     let client = Client::builder()
         .default_headers(headers)
         .build()
-        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+            Box::new(GeneralError {
+                message: format!("Failed to create HTTP client: {}", e.to_string()),
+            })
+        })?;
 
     let request: AnthropicRequest = AnthropicRequest {
         model: MODEL.to_string(),
@@ -93,23 +110,30 @@ pub async fn call_anthropic(
         .await
         .map_err(|e| {
             println!("{:?}", e);
-            Box::new(AnthropicError {
+            Box::new(GeneralError {
                 message: format!("Failed to send request to Anthropic API: {}", e.to_string()),
             }) as Box<dyn std::error::Error + Send + Sync>
         })?;
 
     let rspns_strng = res.text().await.map_err(|e: reqwest::Error| {
         // println!("------------d------------------{:?}", e);
-        Box::new(AnthropicError {
+        Box::new(GeneralError {
             message: format!("Failed to read response from Anthropic API: {}", e.to_string()),
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;
 
     // println!("Raw response: {}", rspns_strng);
 
+    if rspns_strng.contains("invalid x-api-key") {
+        return Err(Box::new(GeneralError {
+            message: "Invalid Anthropic API key. Please check your API key and try again."
+                .to_string(),
+        }));
+    }
+
     let res: AnthropicResponse = serde_json::from_str(&rspns_strng).map_err(|e| {
         println!("{:?}", e);
-        Box::new(AnthropicError {
+        Box::new(GeneralError {
             message: format!(
                 "Failed to parse response from Anthropic API: {}",
                 e.to_string()
@@ -119,19 +143,6 @@ pub async fn call_anthropic(
 
     Ok(res.content[0].text.clone())
 }
-
-#[derive(Debug, Clone)]
-pub struct AnthropicError {
-    pub message: String,
-}
-
-impl std::fmt::Display for AnthropicError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl std::error::Error for AnthropicError {}
 
 #[cfg(test)]
 mod tests {

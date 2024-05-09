@@ -29,6 +29,7 @@ The `llm_api_access` crate uses the `dotenv` library to securely load API creden
 **Example Structure:**
 
 ```
+OPEN_AI_ORG=your_openai_org
 OPENAI_API_KEY=your_openai_api_key
 GEMINI_API_KEY=your_gemini_api_key
 ANTHROPIC_API_KEY=your_anthropic_api_key

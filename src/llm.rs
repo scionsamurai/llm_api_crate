@@ -1,9 +1,10 @@
+// src/llm.rs
 use async_trait::async_trait;
 use crate::openai::call_gpt;
 use crate::gemini::{call_gemini, conversation_gemini_call, get_gemini_model_info, list_gemini_models, count_gemini_tokens};
 use crate::anthropic::call_anthropic;
 use crate::models::ModelInfo;
-use crate::errors::GeminiError;
+use crate::errors::GeneralError;
 use crate::structs::{Message, Content, Part};
 
 pub enum LLM {
@@ -16,7 +17,7 @@ pub enum LLM {
 pub trait Access {
     async fn send_single_message(
         &self,
-        messages: &str,
+        message: &str,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
     async fn send_convo_message(
         &self,
@@ -94,7 +95,7 @@ impl Access for LLM {
     ) -> Result<ModelInfo, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::Gemini => get_gemini_model_info(model).await,
-            _ => Err(Box::new(GeminiError {
+            _ => Err(Box::new(GeneralError {
                 message: format!("Currently only Gemini is implemented for get_model_info func"),
             }) as Box<dyn std::error::Error + Send + Sync>),
         }
@@ -105,7 +106,7 @@ impl Access for LLM {
     ) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::Gemini => list_gemini_models().await,
-            _ => Err(Box::new(GeminiError {
+            _ => Err(Box::new(GeneralError {
                 message: format!("Currently only Gemini is implemented for list_models func"),
             }) as Box<dyn std::error::Error + Send + Sync>),
         }
@@ -117,7 +118,7 @@ impl Access for LLM {
     ) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::Gemini => count_gemini_tokens(text).await,
-            _ => Err(Box::new(GeminiError {
+            _ => Err(Box::new(GeneralError {
                 message: format!("Currently only Gemini is implemented for count_tokens func"),
             }) as Box<dyn std::error::Error + Send + Sync>),
         }
