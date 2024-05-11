@@ -35,7 +35,6 @@ jobs:
             echo "version_changed=false" >> "$GITHUB_ENV"
           fi
 
-      # Run additional tasks if version changed
       - name: Install stable toolchain (for publishing)
         if: "$version_changed" == 'true'
         uses: actions-rs/toolchain@v1
