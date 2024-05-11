@@ -15,23 +15,22 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 2 # Fetch the previous commit to compare with
-
+          
       - name: Get Cargo.toml versions
         id: get_versions
         run: |
           current_version=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)
           previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
-          echo "current_version=$current_version" >> $GITHUB_ENV
-          echo "previous_version=$previous_version" >> $GITHUB_ENV
+          echo "current_version=$current_version" >> $GITHUB_OUTPUT
+          echo "previous_version=$previous_version" >> $GITHUB_OUTPUT
 
       - name: Compare version numbers
         id: compare_versions
         run: |
-          if [[ "$current_version" != "$previous_version" ]]; then
+          if [[ "${{ steps.get_versions.outputs.current_version }}" != "${{ steps.get_versions.outputs.previous_version }}" ]]; then
             echo "Version changed!"
-            echo "version_changed=true" >> $GITHUB_ENV
+            echo "version_changed=true" >> $GITHUB_OUTPUT
           else
             echo "Version unchanged."
-            echo "version_changed=false" >> $GITHUB_ENV
+            echo "version_changed=false" >> $GITHUB_OUTPUT
           fi
-
