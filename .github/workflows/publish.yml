@@ -27,7 +27,7 @@ jobs:
       - name: Compare version numbers
         id: compare_versions
         run: |
-          if [[ "${{ $current_version }}" != "${{ $previous_version }}" ]]; then
+          if [[ "$current_version" != "$previous_version" ]]; then
             echo "Version changed!"
             echo "version_changed=true" >> "$GITHUB_ENV"
           else
