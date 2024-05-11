@@ -23,8 +23,9 @@ jobs:
           previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
           echo 'current_version=$current_version' >> "$GITHUB_OUTPUT"
           echo 'previous_version=$previous_version' >> "$GITHUB_OUTPUT"
-          echo '$current_version'
-          echo '$previous_version'
+          echo '{{ $current_version }}'
+          echo '{{ $previous_version }}'
+          echo '{{ $GITHUB_OUTPUT }}'
 
       - name: Compare version numbers
         id: compare_versions
