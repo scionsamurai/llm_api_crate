@@ -21,18 +21,18 @@ jobs:
         run: |
           current_version=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)
           previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
-          echo "current_version=$current_version" >> $GITHUB_OUTPUT
-          echo "previous_version=$previous_version" >> $GITHUB_OUTPUT
+          echo "current_version=$current_version" >> "$GITHUB_OUTPUT"
+          echo "previous_version=$previous_version" >> "$GITHUB_OUTPUT"
 
       - name: Compare version numbers
         id: compare_versions
         run: |
           if [[ "${{ steps.get_versions.outputs.current_version }}" != "${{ steps.get_versions.outputs.previous_version }}" ]]; then
             echo "Version changed!"
-            echo "version_changed=true" >> $GITHUB_OUTPUT
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "Version unchanged."
-            echo "version_changed=false" >> $GITHUB_OUTPUT
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
           fi
 
       # Run additional tasks if version changed
