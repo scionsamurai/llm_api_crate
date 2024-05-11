@@ -19,8 +19,10 @@ jobs:
       - name: Get Cargo.toml versions
         id: get_versions
         run: |
-          echo 'current_version=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)' >> "$GITHUB_OUTPUT"
-          echo 'previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)' >> "$GITHUB_OUTPUT"
+          current_version=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)
+          previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
+          echo 'current_version=$current_version' >> "$GITHUB_OUTPUT"
+          echo 'previous_version=$previous_version' >> "$GITHUB_OUTPUT"
 
       - name: Compare version numbers
         id: compare_versions
