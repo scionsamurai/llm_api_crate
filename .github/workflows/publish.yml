@@ -35,17 +35,3 @@ jobs:
             echo "version_changed=false" >> "$GITHUB_ENV"
           fi
 
-      - name: Install stable toolchain (for publishing)
-        if: "$version_changed" == 'true'
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - name: Publish
-        if: "$version_changed" == 'true'
-        run: |
-          cargo publish --token ${CRATES_TOKEN}
-        env:
-          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
