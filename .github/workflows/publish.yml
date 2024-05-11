@@ -24,7 +24,6 @@ jobs:
           echo current_version=$current_version >> $GITHUB_OUTPUT
           echo previous_version=$previous_version >> $GITHUB_OUTPUT
 
-
       - name: Compare version numbers
         id: compare_versions
         env:
@@ -42,11 +41,7 @@ jobs:
       # Run additional tasks if version changed
       - name: Install stable toolchain (for publishing)
         if: steps.compare_versions.outputs.version_changed == 'true'
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Publish
         if: steps.compare_versions.outputs.version_changed == 'true'
