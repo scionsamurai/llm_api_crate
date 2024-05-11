@@ -29,7 +29,10 @@ jobs:
 
       - name: Compare version numbers
         id: compare_versions
+        env:
+          CURRENT_VERSION: ${{ steps.get_versions.outputs.current_version }}
         run: |
+          echo "The version is $CURRENT_VERSION"
           if [[ "${{ steps.get_versions.outputs.current_version }}" != "${{ steps.get_versions.outputs.previous_version }}" ]]; then
             echo "Version changed!"
             echo 'version_changed=true' >> "$GITHUB_OUTPUT"
