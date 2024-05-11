@@ -19,25 +19,23 @@ jobs:
       - name: Get Cargo.toml versions
         id: get_versions
         run: |
-          cv=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)
-          previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
-          echo 'current_version=$cv' >> "$GITHUB_ENV"
-          echo 'previous_version=$previous_version' >> "$GITHUB_ENV"
+          echo "current_version=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)" >> "$GITHUB_OUTPUT"
+          echo "previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)" >> "$GITHUB_OUTPUT"
 
       - name: Compare version numbers
         id: compare_versions
         run: |
-          if [[ "$current_version" != "$previous_version" ]]; then
+          if [[ "${{ steps.get_versions.outputs.current_version }}" != "${{ steps.get_versions.outputs.previous_version }}" ]]; then
             echo "Version changed!"
-            echo 'version_changed=true' >> "$GITHUB_ENV"
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "Version unchanged."
-            echo 'version_changed=false' >> "$GITHUB_ENV"
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
           fi
 
       # Run additional tasks if version changed
       - name: Install stable toolchain (for publishing)
-        if: "$version_changed" == 'true'
+        if: steps.compare_versions.outputs.version_changed == 'true'
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -45,7 +43,7 @@ jobs:
           override: true
 
       - name: Publish
-        if: "$version_changed" == 'true'
+        if: steps.compare_versions.outputs.version_changed == 'true'
         run: |
           cargo publish --token ${CRATES_TOKEN}
         env:
