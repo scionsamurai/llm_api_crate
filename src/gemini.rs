@@ -87,7 +87,7 @@ pub async fn call_gemini(
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;
 
-    // println!("Raw response: {}", rspns_strng);
+    println!("Raw response: {}", rspns_strng);
 
     let res: GeminiResponse = serde_json::from_str(&rspns_strng).map_err(|e| {
         println!("{:?}", e);

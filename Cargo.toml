@@ -2,7 +2,7 @@
 name = "llm_api_access"
 description = "A package to Query popular LLM"
 license = "MIT OR Apache-2.0"
-version = "0.1.9"
+version = "0.1.9.1"
 edition = "2021"
 repository = "https://github.com/scionsamurai/llm_api_crate"
 
