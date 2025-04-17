@@ -136,7 +136,7 @@ pub async fn conversation_gemini_call(
     })?;
 
     let url: &str =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
     let client = Client::new();
 
@@ -311,8 +311,11 @@ pub async fn count_gemini_tokens(
             message: format!("Failed to read response from Gemini API: {}", e.to_string()),
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;
-    let res: CountTokensResponse = serde_json::from_str(&rspns_strng).unwrap();
-    Ok(res.totalTokens)
+    let tok_resp: CountTokensResponse = serde_json::from_str(&rspns_strng)
+        .map_err(|e| GeneralError {
+            message: format!("Failed to parse token count response: {}", e),
+        })?;
+    Ok(tok_resp.totalTokens)
 }
 
 
