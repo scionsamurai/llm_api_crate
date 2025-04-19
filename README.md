@@ -108,6 +108,56 @@ async fn main() {
 
 **Note:** This example requires API keys and configuration for the Gemini LLM provider.
 
+## Embeddings
+
+The crate provides support for generating text embeddings through the OpenAI API.
+
+### OpenAI Embeddings
+
+The `openai` module includes functionality to generate vector embeddings:
+
+```rust
+pub async fn get_embedding(
+    input: String,
+    dimensions: Option<u32>,
+) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>>
+```
+
+This function takes:
+- `input`: The text to generate embeddings for
+- `dimensions`: Optional parameter to specify the number of dimensions (if omitted, uses the model default)
+
+It returns a vector of floating point values representing the text embedding.
+
+### Example Usage:
+
+```rust
+use llm_api_crate::openai::get_embedding;
+
+#[tokio::main]
+async fn main() {
+    // Generate an embedding with default dimensions
+    match get_embedding("This is a sample text for embedding".to_string(), None).await {
+        Ok(embedding) => {
+            println!("Generated embedding with {} dimensions", embedding.len());
+            // Use embedding for semantic search, clustering, etc.
+        },
+        Err(err) => eprintln!("Error generating embedding: {}", err),
+    }
+    
+    // Generate an embedding with custom dimensions
+    match get_embedding("Custom dimension embedding".to_string(), Some(64)).await {
+        Ok(embedding) => {
+            println!("Generated custom embedding with {} dimensions", embedding.len());
+            assert_eq!(embedding.len(), 64);
+        },
+        Err(err) => eprintln!("Error generating embedding: {}", err),
+    }
+}
+```
+
+The function uses the "text-embedding-3-small" model by default and requires the same environment variables as other OpenAI API calls (`OPEN_AI_KEY` and `OPEN_AI_ORG`).
+
 ## Testing
 
 The `llm_api_access` crate includes unit tests for various methods in the `Access` trait. These tests showcase usage and expected behavior with different LLM providers.
