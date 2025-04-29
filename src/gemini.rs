@@ -78,7 +78,7 @@ pub async fn call_gemini(
     })?;
 
     let url: &str =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent";
 
     let client = Client::new();
 
@@ -113,7 +113,7 @@ pub async fn call_gemini(
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;
 
-    // println!("Raw response: {}", rspns_strng);
+    println!("Raw response: {}", rspns_strng);
 
     let res: GeminiResponse = serde_json::from_str(&rspns_strng).map_err(|e| {
         println!("{:?}", e);
