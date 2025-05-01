@@ -72,13 +72,13 @@ pub async fn call_gemini(
     messages: Vec<Message>,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
-
+    
     let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GEMINI API KEY not found in environment variables".to_string(),
     })?;
 
     let url: &str =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent";
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
     let client = Client::new();
 
