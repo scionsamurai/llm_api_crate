@@ -26,8 +26,8 @@ pub struct AnthropicMessage {
     pub content: String,
 }
 
-const MODEL: &str = "claude-3-opus-20240229";
-const MAX_TOKENS: usize = 1024;
+const MODEL: &str = "claude-3-7-sonnet-20250219";
+const MAX_TOKENS: usize = 4096;
 
 use std::str;
 
@@ -97,10 +97,18 @@ pub async fn call_anthropic(
             })
         })?;
 
+    // Convert "model" roles to "assistant" roles
+    let processed_messages = messages.into_iter().map(|mut message| {
+        if message.role == "model" {
+            message.role = "assistant".to_string();
+        }
+        message
+    }).collect::<Vec<Message>>();
+
     let request: AnthropicRequest = AnthropicRequest {
         model: MODEL.to_string(),
         max_tokens: MAX_TOKENS,
-        messages,
+        messages: processed_messages,
     };
 
     let res = client
@@ -115,8 +123,8 @@ pub async fn call_anthropic(
             }) as Box<dyn std::error::Error + Send + Sync>
         })?;
 
+    // Rest of the function remains the same
     let rspns_strng = res.text().await.map_err(|e: reqwest::Error| {
-        // println!("------------d------------------{:?}", e);
         Box::new(GeneralError {
             message: format!("Failed to read response from Anthropic API: {}", e.to_string()),
         }) as Box<dyn std::error::Error + Send + Sync>
@@ -132,7 +140,7 @@ pub async fn call_anthropic(
     }
 
     let res: AnthropicResponse = serde_json::from_str(&rspns_strng).map_err(|e| {
-        println!("{:?}", e);
+        println!("AnthropicResponse res: {:?}", e);
         Box::new(GeneralError {
             message: format!(
                 "Failed to parse response from Anthropic API: {}",

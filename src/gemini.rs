@@ -191,7 +191,7 @@ pub async fn conversation_gemini_call(
 
     // Try to parse the response as a GeminiResponse
     let gemini_response: Result<GeminiResponse, _> = serde_json::from_str(&response_body).map_err(|_| {
-        println!("Raw response_body: {}", &response_body);
+        // println!("Raw response_body: {}", &response_body);
         Box::new(GeneralError {
             message: "Failed to parse response from Gemini API".to_string(),
         }) as Box<dyn std::error::Error + Send + Sync>
