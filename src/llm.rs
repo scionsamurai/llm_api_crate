@@ -32,6 +32,7 @@ pub trait Access {
     async fn count_tokens(
         &self,
         text: &str,
+        model: &str,
     ) -> Result<u32, Box<dyn std::error::Error + Send + Sync>>;
 }
 
@@ -115,9 +116,10 @@ impl Access for LLM {
     async fn count_tokens(
         &self,
         text: &str,
+        model: &str,
     ) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
         match self {
-            LLM::Gemini => count_gemini_tokens(text).await,
+            LLM::Gemini => count_gemini_tokens(text, model).await,
             _ => Err(Box::new(GeneralError {
                 message: format!("Currently only Gemini is implemented for count_tokens func"),
             }) as Box<dyn std::error::Error + Send + Sync>),
@@ -311,7 +313,8 @@ mod tests {
     async fn test_count_tokens() {
         let llm = LLM::Gemini;
         let text = "Write a story about a magic backpack.";
-        let res = llm.count_tokens(text).await;
+        let model = "models/gemini-2.0-flash";
+        let res = llm.count_tokens(text, model).await;
         match res {
             Ok(token_count) => {
                 println!("Ok: {}", &token_count);
