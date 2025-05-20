@@ -4,7 +4,7 @@ use std::env;
 use dotenv::dotenv;
 
 use crate::errors::GeneralError;
-use crate::structs::Content;
+use crate::structs::general::Content;
 use crate::gemini::types::GeminiRequest;
 use crate::gemini::request::gemini_request;
 use crate::gemini::response::handle_gemini_error;

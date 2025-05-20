@@ -1,4 +1,4 @@
-// src/gemini.rs
+// src/gemini/mod.rs
 pub mod api;
 pub mod types;
 pub mod request;
@@ -12,7 +12,7 @@ pub use types::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::structs::{ Message, Content, Part };
+    use crate::structs::general::{ Message, Content, Part };
 
     #[tokio::test]
     async fn test_call_gemini() {

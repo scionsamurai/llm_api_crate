@@ -532,7 +532,7 @@ checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
 
 [[package]]
 name = "llm_api_access"
-version = "0.1.16"
+version = "0.1.17"
 dependencies = [
  "async-trait",
  "dotenv",

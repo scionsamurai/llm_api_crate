@@ -3,7 +3,7 @@ use std::env;
 use dotenv::dotenv;
 
 use crate::errors::GeneralError;
-use crate::structs::{ Message, Content, Part };
+use crate::structs::general::{ Message, Content, Part };
 use crate::gemini::types::GeminiRequest;
 use crate::gemini::request::gemini_request;
 use crate::gemini::response::parse_gemini_response;

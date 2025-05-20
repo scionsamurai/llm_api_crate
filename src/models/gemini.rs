@@ -1,3 +1,4 @@
+// src/models/gemini.rs
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]

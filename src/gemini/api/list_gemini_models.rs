@@ -4,7 +4,7 @@ use dotenv::dotenv;
 use reqwest::header::{HeaderMap, HeaderValue};
 
 use crate::errors::GeneralError;
-use crate::models::{ListModelsResponse, ModelInfo};
+use crate::models::gemini::{ListModelsResponse, ModelInfo};
 
 
 pub async fn list_gemini_models() -> Result<Vec<ModelInfo>, Box<dyn std::error::Error + Send + Sync>>

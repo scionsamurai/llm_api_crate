@@ -3,7 +3,7 @@ use std::env;
 use dotenv::dotenv;
 
 use crate::errors::GeneralError;
-use crate::models::ModelInfo;
+use crate::models::gemini::ModelInfo;
 use reqwest::header::{HeaderMap, HeaderValue};
 
 

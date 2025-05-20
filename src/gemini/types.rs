@@ -2,6 +2,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::structs::general::Content;
+
 #[derive(Debug, Serialize)]
 pub struct GeminiRequest {
     pub contents: Vec<Content>,
@@ -69,7 +71,7 @@ pub struct GeminiError {
     pub code: u16,
     pub message: String,
     pub status: String,
-    pub details: Vec<GeminiErrorDetail>,
+    pub details: Option<Vec<GeminiErrorDetail>>, 
 }
 
 #[allow(dead_code)]
@@ -81,5 +83,3 @@ pub struct GeminiErrorDetail {
     pub domain: String,
     pub metadata: HashMap<String, String>,
 }
-
-use crate::structs::Content;
