@@ -50,7 +50,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 ### `send_single_message` Example
 
 ```rust
-use llm::{LLM, Access};
+use llm_api_access::llm::{Access, LLM};
 
 #[tokio::main]
 async fn main() {
@@ -73,7 +73,8 @@ This example creates an instance of the `LLM::OpenAI` provider and sends a singl
 ### `send_convo_message` Example
 
 ```rust
-use llm::{LLM, Access, Message};
+use llm_api_access::llm::{Access, LLM};
+use llm_api_access::structs::general::Message;
 
 #[tokio::main]
 async fn main() {
@@ -132,7 +133,7 @@ It returns a vector of floating point values representing the text embedding.
 ### Example Usage:
 
 ```rust
-use llm_api_crate::openai::get_embedding;
+use llm_api_access::openai::get_embedding;
 
 #[tokio::main]
 async fn main() {
