@@ -15,3 +15,10 @@ dotenv = "0.15.0"
 reqwest = { version = "0.11.17", features = ["json"] }
 async-trait = "0.1.68"
 tokio = { version = "1.28.0", features = ["full"] }
+pyo3 = { version = "0.20", features = ["extension-module"] }
+pyo3-asyncio = { version = "0.20.0", features = ["attributes", "tokio-runtime"] }
+
+[lib]
+name = "llm_api_access"  # Or choose a different name for your python package, e.g., "llm_api"
+crate-type = ["cdylib"]
+
