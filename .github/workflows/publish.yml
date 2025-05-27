@@ -17,4 +17,5 @@ jobs:
         MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
       with:
         command: publish
+        maturin-version: "1.4.0"
 
