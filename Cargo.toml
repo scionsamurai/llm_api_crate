@@ -1,6 +1,6 @@
 [package]
 name = "llm_api_access"
-description = "A package to Query popular LLM"
+description = "A package to query popular LLMs"
 license = "MIT OR Apache-2.0"
 version = "0.1.18"
 edition = "2021"
