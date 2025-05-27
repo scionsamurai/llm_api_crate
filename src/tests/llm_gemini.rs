@@ -54,15 +54,17 @@ mod tests {
     #[tokio::test]
     async fn test_get_model_info() {
         let llm = LLM::Gemini;
-        let res = llm.get_model_info("gemini-1.0-pro-001").await;
+        let gemini_models = llm.list_models().await.unwrap();
+        let model_name = gemini_models[0].name.clone(); // name like "models/gemini-2.0-flash"
+        let res = llm.get_model_info(&model_name).await;
         match res {
             Ok(model_info) => {
                 println!("Ok: {:?}", &model_info);
-                assert_eq!(model_info.name, "models/gemini-1.0-pro-001");
+                assert_eq!(model_info.name, model_name);
             }
             Err(err) => {
                 println!("Error: {}", err);
-                assert!(false, "Failed to get model info");
+                assert!(false);
             }
         }
     }

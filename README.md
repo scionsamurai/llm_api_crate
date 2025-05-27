@@ -13,17 +13,17 @@ The `llm_api_access` library (available as a Rust crate and Python package) prov
 
 ### Rust
 
-Add `llm_api_access` to your `Cargo.toml`:
+Add `llm_api_access` to your `Cargo.toml` so it can install from [Crates](https://crates.io/crates/llm_api_access):
 
 ```toml
 [dependencies]
-llm_api_access = "0.1.0" # Use the latest version
-tokio = { version = "1", features = ["full"] } # Required for async operations
+llm_api_access = "0.1.XX" # Update this to be the latest version
+tokio = { version = "1.28.0", features = ["full"] } # Required for async operations
 ```
 
 ### Python
 
-Install from PyPI:
+Install from [PyPI](https://pypi.org/project/llm-api-access/):
 
 ```bash
 pip install llm-api-access
