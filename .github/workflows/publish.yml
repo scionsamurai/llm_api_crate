@@ -4,17 +4,56 @@ on:
       - main
   workflow_dispatch:
 
-name: Build and Upload
+name: Publish
 
 jobs:
-  build-and-upload:
+  publish:
+    name: Publish
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Build and publish
-      uses: PyO3/maturin-action@v1
-      env:
-        MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-      with:
-        command: publish
+      - name: Checkout sources
+        uses: actions/checkout@v4 # Changed to v4 for consistency
+        with:
+          fetch-depth: 2 # Fetch the previous commit to compare with
 
+      - name: Get Cargo.toml versions
+        id: get_versions
+        run: |
+          current_version=$(grep -oE 'version = "[^"]+"' Cargo.toml | cut -d '"' -f 2)
+          previous_version=$(git show HEAD^1:Cargo.toml | grep -oE 'version = "[^"]+"' | cut -d '"' -f 2)
+          echo current_version=$current_version >> $GITHUB_OUTPUT
+          echo previous_version=$previous_version >> $GITHUB_OUTPUT
+
+      - name: Compare version numbers
+        id: compare_versions
+        env:
+          CURRENT_VERSION: ${{ steps.get_versions.outputs.current_version }}
+        run: |
+          echo "The version is $CURRENT_VERSION"
+          if [[ "${{ steps.get_versions.outputs.current_version }}" != "${{ steps.get_versions.outputs.previous_version }}" ]]; then
+            echo "Version changed!"
+            echo version_changed=true >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged."
+            echo version_changed=false >> $GITHUB_OUTPUT
+          fi
+
+      # Run additional tasks if version changed
+      - name: Install stable toolchain (for publishing to Crates.io)
+        if: steps.compare_versions.outputs.version_changed == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to Crates.io
+        if: steps.compare_versions.outputs.version_changed == 'true'
+        run: |
+          cargo publish --token ${CRATES_TOKEN}
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+
+      - name: Build and publish to PyPI
+        if: steps.compare_versions.outputs.version_changed == 'true'
+        uses: PyO3/maturin-action@v1
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        with:
+          command: publish
