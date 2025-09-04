@@ -23,11 +23,11 @@ impl<'source> FromPyObject<'source> for Message {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
         let dict = ob.downcast::<pyo3::types::PyDict>()?;
         
-        let role: String = dict.get_item("role")?
+        let role: String = dict.get_item("role")
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing 'role' key"))?
             .extract()?;
             
-        let content: String = dict.get_item("content")?
+        let content: String = dict.get_item("content")
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing 'content' key"))?
             .extract()?;
             
