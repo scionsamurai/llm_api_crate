@@ -9,7 +9,7 @@ mod tests {
     async fn test_send_single_message_openai() {
         let llm: LLM = LLM::OpenAI;
 
-        let res = llm.send_single_message("Hello, can you tell me a joke?").await;
+        let res = llm.send_single_message("Hello, can you tell me a joke?", None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);
@@ -41,7 +41,7 @@ mod tests {
             },
         ];
 
-        let res = llm.send_convo_message(messages).await;
+        let res = llm.send_convo_message(messages, None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);

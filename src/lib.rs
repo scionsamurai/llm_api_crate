@@ -14,7 +14,7 @@ pub mod tests;
 use llm::{LLM, Access};
 
 #[pyfunction]
-fn call_llm(py: Python<'_>, llm_type: String, messages: Vec<structs::general::Message>) -> PyResult<&'_ PyAny> {
+fn call_llm(py: Python<'_>, llm_type: String, messages: Vec<structs::general::Message>, model: Option<String>) -> PyResult<&'_ PyAny> {
     pyo3_asyncio::tokio::future_into_py(py, async move {
         let llm = match llm_type.to_lowercase().as_str() {
             "openai" => LLM::OpenAI,
@@ -22,12 +22,14 @@ fn call_llm(py: Python<'_>, llm_type: String, messages: Vec<structs::general::Me
             _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid LLM type. Choose 'openai' or 'gemini'.")),
         };
 
+        let model_str = model.as_deref();
+
         let result = if messages.len() == 1 {
             // Use send_single_message if only one message is provided
-            llm.send_single_message(&messages[0].content.clone()).await
+            llm.send_single_message(&messages[0].content.clone(), model_str).await
         } else {
             // Use send_convo_message if multiple messages are provided
-            llm.send_convo_message(messages).await
+            llm.send_convo_message(messages, model_str).await
         };
 
         match result {

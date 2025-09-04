@@ -18,10 +18,12 @@ pub trait Access {
     async fn send_single_message(
         &self,
         message: &str,
+        model: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
     async fn send_convo_message(
         &self,
         messages: Vec<Message>,
+        model: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
     async fn get_model_info(
         &self,
@@ -41,6 +43,7 @@ impl Access for LLM {
     async fn send_single_message(
         &self,
         message: &str,
+        model: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::OpenAI => {
@@ -55,7 +58,7 @@ impl Access for LLM {
                     role: "user".to_string(),
                     content: message.to_string(),
                 };
-                call_gemini(vec![gemini_message]).await
+                call_gemini(vec![gemini_message], model).await
             }
             LLM::Anthropic => {
                 let anthropic_message: Message = Message {
@@ -70,6 +73,7 @@ impl Access for LLM {
     async fn send_convo_message(
         &self,
         messages: Vec<Message>,
+        model: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::OpenAI => call_gpt(messages).await,
@@ -84,7 +88,7 @@ impl Access for LLM {
                     })
                     .collect();
     
-                conversation_gemini_call(gemini_messages).await
+                conversation_gemini_call(gemini_messages, model).await
             }
             LLM::Anthropic => call_anthropic(messages).await,
         }

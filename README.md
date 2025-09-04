@@ -2,6 +2,10 @@
 
 The `llm_api_access` library (available as a Rust crate and Python package) provides a unified way to interact with different large language models (LLMs) like OpenAI, Gemini, and Anthropic. It aims to simplify the process of sending messages, managing conversations, and generating embeddings across various LLM providers.
 
+## Current Status
+
+Currently I develop this because it is used to power an open-source coding assistant currently in active development. Gemini has been the main test target; OpenAI (including embeddings) and Anthropic are supported but have been exercised less. Development is self encouraged so updates can be far and few between, open an issue on github if you want something specific.
+
 ## Key Features
 
 * **Unified LLM Access:** Interact with OpenAI, Gemini, and Anthropic through a consistent interface.
