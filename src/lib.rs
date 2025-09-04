@@ -1,6 +1,6 @@
 // src/lib.rs
 
-mod llm;
+pub mod llm;
 pub mod openai;
 pub mod gemini;
 pub mod anthropic;
