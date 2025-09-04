@@ -2,7 +2,7 @@
 name = "llm_api_access"
 description = "A package to query popular LLMs"
 license = "MIT OR Apache-2.0"
-version = "0.1.25"
+version = "0.1.26"
 edition = "2021"
 repository = "https://github.com/scionsamurai/llm_api_crate"
 
@@ -16,7 +16,4 @@ reqwest = { version = "0.11.17", features = ["json", "rustls-tls"], default-feat
 async-trait = "0.1.68"
 tokio = { version = "1.28.0", features = ["full"] }
 
-[lib]
-name = "llm_api_access"  # Or choose a different name for your python package, e.g., "llm_api"
-crate-type = ["cdylib"]
 
