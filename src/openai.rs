@@ -15,20 +15,34 @@ const EMBEDDING_ENCODING_FORMAT: &str = "float";
 
 pub async fn call_gpt(
     messages: Vec<Message>,
+    api_key_override: Option<&str>, // Add api_key_override parameter
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
 
-    let api_key: String =
-        env::var("OPEN_AI_KEY").expect("OPEN AI KEY not found in environment variables");
+    // Use api_key_override if provided, otherwise fall back to environment variable
+    let resolved_api_key: String = if let Some(key) = api_key_override {
+        key.to_string()
+    } else {
+        env::var("OPEN_AI_KEY").map_err(|_| {
+            Box::new(GeneralError {
+                message: "OPEN_AI_KEY not found in environment variables".to_string(),
+            }) as Box<dyn std::error::Error + Send + Sync>
+        })?
+    };
+
     let api_org: String =
-        env::var("OPEN_AI_ORG").expect("OPEN AI KEY not found in environment variables");
+        env::var("OPEN_AI_ORG").map_err(|_| { // Update to handle error instead of expect
+            Box::new(GeneralError {
+                message: "OPEN_AI_ORG not found in environment variables".to_string(),
+            }) as Box<dyn std::error::Error + Send + Sync>
+        })?;
 
     let url: &str = "https://api.openai.com/v1/chat/completions";
 
     let mut headers: HeaderMap = HeaderMap::new();
     headers.insert(
         "authorization",
-        HeaderValue::from_str(&format!("Bearer {}", api_key))
+        HeaderValue::from_str(&format!("Bearer {}", resolved_api_key)) // Use resolved_api_key
             .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
     );
     headers.insert(
@@ -87,6 +101,8 @@ pub async fn get_embedding(
 ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
 
+    // The original query only specified send_single_message and send_convo_message,
+    // but for consistency, you might want to consider adding api_key_override here too.
     let api_key: String =
         env::var("OPEN_AI_KEY").expect("OPEN AI KEY not found in environment variables");
     let api_org: String =

@@ -48,12 +48,20 @@ pub struct Content {
 
 pub async fn call_anthropic(
     messages: Vec<Message>,
+    api_key_override: Option<&str>, // Add api_key_override parameter
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
 
-    let api_key: String = env::var("ANTHROPIC_API_KEY").map_err(|_| GeneralError {
-        message: "ANTHROPIC API KEY not found in environment variables".to_string(),
-    })?;
+    // Use api_key_override if provided, otherwise fall back to environment variable
+    let resolved_api_key: String = if let Some(key) = api_key_override {
+        key.to_string()
+    } else {
+        env::var("ANTHROPIC_API_KEY").map_err(|_| {
+            Box::new(GeneralError {
+                message: "ANTHROPIC_API_KEY not found in environment variables".to_string(),
+            }) as Box<dyn std::error::Error + Send + Sync>
+        })?
+    };
 
     let url: &str = "https://api.anthropic.com/v1/messages";
 
@@ -61,7 +69,7 @@ pub async fn call_anthropic(
 
     headers.insert(
         "x-api-key",
-        HeaderValue::from_str(&api_key)
+        HeaderValue::from_str(&resolved_api_key) // Use resolved_api_key
             .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
                 Box::new(GeneralError {
                     message: format!("Invalid Anthropic API key: {}", e.to_string()),

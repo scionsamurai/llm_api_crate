@@ -11,7 +11,7 @@ mod tests {
             content: "Hello, can you tell me a joke?".to_string(),
         };
         let messages = vec![user_message];
-        let res = call_gpt(messages).await;
+        let res = call_gpt(messages, None).await;
         match res {
             Ok(response) => assert!(!response.is_empty(), "Response should not be empty"),
             Err(err) => panic!("Call to OpenAI API failed: {}", err),
@@ -29,7 +29,7 @@ mod tests {
             content: "Hello, can you write a python function that reverses a string?".to_string(),
         };
         let mut messages = vec![system_message, user_message_1];
-        let res = call_gpt(messages.clone()).await;
+        let res = call_gpt(messages.clone(), None).await;
         match res {
             Ok(response) => {
                 assert!(!response.is_empty(), "Response should not be empty");
@@ -38,7 +38,7 @@ mod tests {
                     content: "Can you also provide an example of how to use that function?".to_string(),
                 };
                 messages.push(user_message_2);
-                let res = call_gpt(messages).await;
+                let res = call_gpt(messages, None).await;
                 match res {
                     Ok(response) => assert!(!response.is_empty(), "Response should not be empty"),
                     Err(err) => panic!("Call to OpenAI API failed on second prompt: {}", err),

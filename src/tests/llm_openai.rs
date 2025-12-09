@@ -9,7 +9,8 @@ mod tests {
     async fn test_send_single_message_openai() {
         let llm: LLM = LLM::OpenAI;
 
-        let res = llm.send_single_message("Hello, can you tell me a joke?", None).await;
+        // Pass None for the API key to use the environment variable
+        let res = llm.send_single_message("Hello, can you tell me a joke?", None, None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);
@@ -41,7 +42,8 @@ mod tests {
             },
         ];
 
-        let res = llm.send_convo_message(messages, None).await;
+        // Pass None for the API key to use the environment variable
+        let res = llm.send_convo_message(messages, None, None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);

@@ -19,11 +19,13 @@ pub trait Access {
         &self,
         message: &str,
         model: Option<&str>,
+        api_key: Option<&str>, // Add api_key parameter
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
     async fn send_convo_message(
         &self,
         messages: Vec<Message>,
         model: Option<&str>,
+        api_key: Option<&str>, // Add api_key parameter
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
     async fn get_model_info(
         &self,
@@ -44,6 +46,7 @@ impl Access for LLM {
         &self,
         message: &str,
         model: Option<&str>,
+        api_key: Option<&str>, // Add api_key parameter
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::OpenAI => {
@@ -51,21 +54,21 @@ impl Access for LLM {
                     role: "user".to_string(),
                     content: message.to_string(),
                 };
-                call_gpt(vec![openai_message]).await
+                call_gpt(vec![openai_message], api_key).await // Pass api_key
             }
             LLM::Gemini => {
                 let gemini_message: Message = Message {
                     role: "user".to_string(),
                     content: message.to_string(),
                 };
-                call_gemini(vec![gemini_message], model).await
+                call_gemini(vec![gemini_message], model, api_key).await // Pass api_key
             }
             LLM::Anthropic => {
                 let anthropic_message: Message = Message {
                     role: "user".to_string(),
                     content: message.to_string(),
                 };
-                call_anthropic(vec![anthropic_message]).await
+                call_anthropic(vec![anthropic_message], api_key).await // Pass api_key
             }
         }
     }
@@ -74,9 +77,10 @@ impl Access for LLM {
         &self,
         messages: Vec<Message>,
         model: Option<&str>,
+        api_key: Option<&str>, // Add api_key parameter
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         match self {
-            LLM::OpenAI => call_gpt(messages).await,
+            LLM::OpenAI => call_gpt(messages, api_key).await, // Pass api_key
             LLM::Gemini => {
                 let gemini_messages: Vec<Content> = messages
                     .into_iter()
@@ -88,9 +92,9 @@ impl Access for LLM {
                     })
                     .collect();
     
-                conversation_gemini_call(gemini_messages, model).await
+                conversation_gemini_call(gemini_messages, model, api_key).await // Pass api_key
             }
-            LLM::Anthropic => call_anthropic(messages).await,
+            LLM::Anthropic => call_anthropic(messages, api_key).await, // Pass api_key
         }
     }
 
@@ -99,7 +103,7 @@ impl Access for LLM {
         model: &str,
     ) -> Result<ModelInfo, Box<dyn std::error::Error + Send + Sync>> {
         match self {
-            LLM::Gemini => get_gemini_model_info(model).await,
+            LLM::Gemini => get_gemini_model_info(model).await, // Note: get_gemini_model_info might also need an api_key if you extend this pattern to it.
             _ => Err(Box::new(GeneralError {
                 message: format!("Currently only Gemini is implemented for get_model_info func"),
             }) as Box<dyn std::error::Error + Send + Sync>),
@@ -110,7 +114,7 @@ impl Access for LLM {
         &self,
     ) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error + Send + Sync>> {
         match self {
-            LLM::Gemini => list_gemini_models().await,
+            LLM::Gemini => list_gemini_models().await, // Note: list_gemini_models might also need an api_key if you extend this pattern to it.
             _ => Err(Box::new(GeneralError {
                 message: format!("Currently only Gemini is implemented for list_models func"),
             }) as Box<dyn std::error::Error + Send + Sync>),
@@ -123,7 +127,7 @@ impl Access for LLM {
         model: &str,
     ) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
         match self {
-            LLM::Gemini => count_gemini_tokens(text, model).await,
+            LLM::Gemini => count_gemini_tokens(text, model).await, // Note: count_gemini_tokens might also need an api_key if you extend this pattern to it.
             _ => Err(Box::new(GeneralError {
                 message: format!("Currently only Gemini is implemented for count_tokens func"),
             }) as Box<dyn std::error::Error + Send + Sync>),

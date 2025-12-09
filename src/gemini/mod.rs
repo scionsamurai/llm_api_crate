@@ -23,7 +23,7 @@ mod tests {
 
         let messages: Vec<Message> = vec![message];
 
-        let res = call_gemini(messages, None).await;
+        let res = call_gemini(messages, None, None).await;
         match res {
             Ok(res_str) => {
                 println!("res: {}", res_str);
@@ -59,7 +59,7 @@ mod tests {
             },
         ];
 
-        let res = conversation_gemini_call(messages, None).await;
+        let res = conversation_gemini_call(messages, None, None).await;
         match res {
             Ok(response) => {
                 assert!(!response.is_empty());

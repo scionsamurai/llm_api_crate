@@ -15,7 +15,7 @@ mod tests {
 
         let messages = vec![user_message];
 
-        let res = call_anthropic(messages).await;
+        let res = call_anthropic(messages, None).await;
         match res {
             Ok(response) => {
                 println!("response: {:}", response);
@@ -45,7 +45,7 @@ mod tests {
             },
         ];
 
-        let res = call_anthropic(messages.clone()).await;
+        let res = call_anthropic(messages.clone(), None).await;
         match res {
             Ok(response) => {
                 assert!(!response.is_empty(), "Response should not be empty");
@@ -62,7 +62,7 @@ mod tests {
 
                 messages.push(user_message_2);
 
-                let res = call_anthropic(messages).await;
+                let res = call_anthropic(messages, None).await;
                 match res {
                     Ok(response) => {
                         assert!(!response.is_empty(), "Response should not be empty");
