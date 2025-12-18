@@ -1,4 +1,3 @@
-// src/tests/llm_gemini.rs
 #[cfg(test)]
 mod tests {
     use crate::llm::{Access, LLM};
@@ -8,8 +7,7 @@ mod tests {
     async fn test_send_single_message_gemini() {
         let llm: LLM = LLM::Gemini;
 
-        // Pass None for the API key to use the environment variable
-        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None, None).await;
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);
@@ -40,8 +38,7 @@ mod tests {
             },
         ];
 
-        // Pass None for the API key to use the environment variable
-        let res = llm.send_convo_message(messages, None, None).await;
+        let res = llm.send_convo_message(messages, None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);
@@ -57,8 +54,6 @@ mod tests {
     #[tokio::test]
     async fn test_get_model_info() {
         let llm = LLM::Gemini;
-        // If you were to extend api_key_override to get_model_info,
-        // you would pass it here as well. For now, it's not part of the query.
         let gemini_models = llm.list_models().await.unwrap();
         let model_name = gemini_models[0].name.clone(); // name like "models/gemini-2.0-flash"
         let res = llm.get_model_info(&model_name).await;
@@ -77,8 +72,6 @@ mod tests {
     #[tokio::test]
     async fn test_list_models() {
         let llm = LLM::Gemini;
-        // If you were to extend api_key_override to list_models,
-        // you would pass it here as well. For now, it's not part of the query.
         let res = llm.list_models().await;
         match res {
             Ok(models) => {
@@ -96,9 +89,7 @@ mod tests {
     async fn test_count_tokens() {
         let llm = LLM::Gemini;
         let text = "Write a story about a magic backpack.";
-        let model = "models/gemini-2.5-flash";
-        // If you were to extend api_key_override to count_tokens,
-        // you would pass it here as well. For now, it's not part of the query.
+        let model = "models/gemini-2.0-flash";
         let res = llm.count_tokens(text, model).await;
         match res {
             Ok(token_count) => {
