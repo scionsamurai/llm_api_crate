@@ -1,9 +1,10 @@
-The `llm_api_access` crate provides a unified way to interact with different large language models (LLMs) like OpenAI, Gemini, and Anthropic.
+# llm_api_access
 
+The `llm_api_access` crate provides a unified way to interact with different large language models (LLMs) like OpenAI, Gemini, and Anthropic.
 
 ## Current Status
 
-Currently I develop this because it is used to power an open-source coding assistant currently in active development. Gemini has been the main test target; OpenAI (including embeddings) and Anthropic are supported but have been exercised less. Development is self encouraged so updates can be far and few between, open an issue on github if you want something specific.
+This crate is used to power an open-source coding assistant currently in active development. Gemini has been the main test target; OpenAI (including embeddings) and Anthropic are supported but have been exercised less. Development is self encouraged so updates can be far and few between, open an issue on github if you want something specific.
 
 ### LLM Enum
 
@@ -18,14 +19,93 @@ This enum represents the supported LLM providers:
 The `Access` trait defines asynchronous methods for interacting with LLMs:
 
 - `send_single_message`: Sends a single message and returns the generated response.
+  ```rust
+  async fn send_single_message(
+        &self,
+        message: &str,
+        model: Option<&str>,
+        config: Option<&LlmConfig>,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
+  ```
 - `send_convo_message`: Sends a list of messages as a conversation and returns the generated response.
+  ```rust
+  async fn send_convo_message(
+        &self,
+        messages: Vec<Message>,
+        model: Option<&str>,
+        config: Option<&LlmConfig>,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
+  ```
 - `get_model_info`: Gets information about a specific LLM model.
+  ```rust
+  async fn get_model_info(
+        &self,
+        model: &str,
+    ) -> Result<ModelInfo, Box<dyn std::error::Error + Send + Sync>>;
+  ```
 - `list_models`: Lists all available LLM models.
+  ```rust
+  async fn list_models(&self)
+        -> Result<Vec<ModelInfo>, Box<dyn std::error::Error + Send + Sync>>;
+  ```
 - `count_tokens`: Counts the number of tokens in a given text.
+  ```rust
+  async fn count_tokens(
+        &self,
+        text: &str,
+        model: &str,
+    ) -> Result<u32, Box<dyn std::error::Error + Send + Sync>>;
+  ```
 
 The `LLM` enum implements `Access`, providing specific implementations for each method based on the chosen LLM provider.
 
 **Note:** Currently, `get_model_info`, `list_models`, and `count_tokens` only work for the Gemini LLM. Other providers return an error indicating this functionality is not yet supported.
+
+### LlmConfig
+
+The `LlmConfig` struct allows you to configure provider-specific settings for the LLM calls. It uses a builder pattern for easy customization.
+
+```rust
+#[derive(Debug, Clone, Default)]
+pub struct LlmConfig {
+    pub temperature: Option<f64>,
+    pub thinking_budget: Option<i32>,
+    // Add other configuration options here
+}
+
+impl LlmConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_temperature(mut self, temperature: f64) -> Self {
+        self.temperature = Some(temperature);
+        self
+    }
+
+    pub fn with_thinking_budget(mut self, thinking_budget: i32) -> Self {
+        self.thinking_budget = Some(thinking_budget);
+        self
+    }
+}
+```
+
+**Example Usage:**
+
+```rust
+use llm_api_access::config::LlmConfig;
+
+// Default usage (no config)
+let config = None;
+
+// With thinking budget
+let config = Some(LlmConfig::new().with_thinking_budget(1024));
+
+// With multiple options
+let config = Some(LlmConfig::new()
+    .with_thinking_budget(2048)
+    .with_temperature(0.7));
+```
 
 ### Loading API Credentials with dotenv
 
@@ -51,19 +131,28 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 
 ## Example Usage
 
-
 ### `send_single_message` Example
 
 ```rust
 use llm_api_access::llm::{Access, LLM};
+use llm_api_access::config::LlmConfig; // Import LlmConfig
 
 #[tokio::main]
 async fn main() {
     // Create an instance of the OpenAI LLM
     let llm = LLM::OpenAI;
 
-    // Send a single message to the LLM
-    let response = llm.send_single_message("Tell me a joke about programmers").await;
+    // Send a single message to the LLM with no config
+    let response = llm.send_single_message("Tell me a joke about programmers", None, None).await;
+
+    match response {
+        Ok(joke) => println!("Joke: {}", joke),
+        Err(err) => eprintln!("Error: {}", err),
+    }
+
+    //Send a single message to the LLM with a config
+    let config = Some(LlmConfig::new().with_temperature(0.7));
+    let response = llm.send_single_message("Tell me a joke about programmers", None, config.as_ref()).await;
 
     match response {
         Ok(joke) => println!("Joke: {}", joke),
@@ -74,12 +163,12 @@ async fn main() {
 
 This example creates an instance of the `LLM::OpenAI` provider and sends a single message using the `send_single_message` method. It then matches the result, printing the generated joke or an error message if an error occurred.
 
-
 ### `send_convo_message` Example
 
 ```rust
 use llm_api_access::llm::{Access, LLM};
 use llm_api_access::structs::general::Message;
+use llm_api_access::config::LlmConfig; // Import LlmConfig
 
 #[tokio::main]
 async fn main() {
@@ -102,8 +191,17 @@ async fn main() {
         },
     ];
 
-    // Send the conversation messages to the LLM
-    let response = llm.send_convo_message(messages).await;
+    // Send the conversation messages to the LLM with no config
+    let response = llm.send_convo_message(messages, None, None).await;
+
+    match response {
+        Ok(code) => println!("Code: {}", code),
+        Err(err) => eprintln!("Error: {}", err),
+    }
+
+    // Send the conversation messages to the LLM with a config
+    let config = Some(LlmConfig::new().with_thinking_budget(2048));
+    let response = llm.send_convo_message(messages, None, config.as_ref()).await;
 
     match response {
         Ok(code) => println!("Code: {}", code),
@@ -166,4 +264,8 @@ The function uses the "text-embedding-3-small" model by default and requires the
 
 ## Testing
 
-The `llm_api_access` crate includes unit tests for various methods in the `Access` trait. These tests showcase usage and expected behavior with different LLM providers.
+The `llm_api_access` crate includes unit tests for various methods in the `Access` trait.  To run the tests, use:
+
+```bash
+cargo test
+```
