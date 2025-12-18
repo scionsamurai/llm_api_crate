@@ -9,3 +9,4 @@ pub mod models;
 pub mod token_count;
 pub mod structs;
 pub mod tests;
+pub mod config;

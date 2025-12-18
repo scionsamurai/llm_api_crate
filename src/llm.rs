@@ -6,6 +6,7 @@ use crate::anthropic::call_anthropic;
 use crate::models::gemini::ModelInfo;
 use crate::errors::GeneralError;
 use crate::structs::general::{Message, Content, Part};
+use crate::config::LlmConfig; // Import LlmConfig
 
 pub enum LLM {
     OpenAI,
@@ -19,11 +20,13 @@ pub trait Access {
         &self,
         message: &str,
         model: Option<&str>,
+        config: Option<&LlmConfig>, // NEW: optional config parameter
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
     async fn send_convo_message(
         &self,
         messages: Vec<Message>,
         model: Option<&str>,
+        config: Option<&LlmConfig>, // NEW: optional config parameter
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
     async fn get_model_info(
         &self,
@@ -44,6 +47,7 @@ impl Access for LLM {
         &self,
         message: &str,
         model: Option<&str>,
+        config: Option<&LlmConfig>, // NEW: optional config parameter
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::OpenAI => {
@@ -58,7 +62,7 @@ impl Access for LLM {
                     role: "user".to_string(),
                     content: message.to_string(),
                 };
-                call_gemini(vec![gemini_message], model).await
+                call_gemini(vec![gemini_message], model, config).await // Pass config
             }
             LLM::Anthropic => {
                 let anthropic_message: Message = Message {
@@ -74,6 +78,7 @@ impl Access for LLM {
         &self,
         messages: Vec<Message>,
         model: Option<&str>,
+        config: Option<&LlmConfig>, // NEW: optional config parameter
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::OpenAI => call_gpt(messages).await,
@@ -88,7 +93,7 @@ impl Access for LLM {
                     })
                     .collect();
     
-                conversation_gemini_call(gemini_messages, model).await
+                conversation_gemini_call(gemini_messages, model, config).await // Pass config
             }
             LLM::Anthropic => call_anthropic(messages).await,
         }

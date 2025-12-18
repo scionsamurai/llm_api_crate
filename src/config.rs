@@ -1,19 +1,24 @@
 // src/config.rs
-use dotenv::dotenv;
-use std::env;
 
-pub fn get_openai_api_key() -> Result<String, std::env::VarError> {
-    env::var("OPENAI_API_KEY")
+#[derive(Debug, Clone, Default)]
+pub struct LlmConfig {
+    pub temperature: Option<f64>,
+    pub thinking_budget: Option<i32>,
+    // Add other configuration options here
 }
 
-pub fn get_openai_org() -> Result<String, std::env::VarError> {
-    env::var("OPEN_AI_ORG")
-}
+impl LlmConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-pub fn get_gemini_api_key() -> Result<String, std::env::VarError> {
-    env::var("GEMINI_API_KEY")
-}
+    pub fn with_temperature(mut self, temperature: f64) -> Self {
+        self.temperature = Some(temperature);
+        self
+    }
 
-pub fn get_anthropic_api_key() -> Result<String, std::env::VarError> {
-    env::var("ANTHROPIC_API_KEY")
+    pub fn with_thinking_budget(mut self, thinking_budget: i32) -> Self {
+        self.thinking_budget = Some(thinking_budget);
+        self
+    }
 }

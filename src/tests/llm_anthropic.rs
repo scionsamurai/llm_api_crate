@@ -1,3 +1,4 @@
+// src/tests/llm_anthropic.rs
 #[cfg(test)]
 mod tests {
     use crate::llm::{Access, LLM};
@@ -7,7 +8,9 @@ mod tests {
     async fn test_send_single_message_anthropic() {
         let llm: LLM = LLM::Anthropic;
 
-        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None).await;
+        //let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None).await; // Old call
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None, None).await; // New call
+
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);
@@ -38,7 +41,9 @@ mod tests {
             },
         ];
 
-        let res = llm.send_convo_message(messages, None).await;
+        //let res = llm.send_convo_message(messages, None).await; // Old call
+        let res = llm.send_convo_message(messages, None, None).await; // New call
+
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);

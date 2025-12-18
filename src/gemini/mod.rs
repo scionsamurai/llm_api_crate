@@ -13,6 +13,7 @@ pub use types::*;
 mod tests {
     use super::*;
     use crate::structs::general::{ Message, Content, Part };
+    use crate::config::LlmConfig;
 
     #[tokio::test]
     async fn test_call_gemini() {
@@ -23,7 +24,9 @@ mod tests {
 
         let messages: Vec<Message> = vec![message];
 
-        let res = call_gemini(messages, None).await;
+        //let res = call_gemini(messages, None).await; // Old call
+        let res = call_gemini(messages, None, None).await; // New call with config = None
+
         match res {
             Ok(res_str) => {
                 println!("res: {}", res_str);
@@ -59,7 +62,7 @@ mod tests {
             },
         ];
 
-        let res = conversation_gemini_call(messages, None).await;
+        let res = conversation_gemini_call(messages, None, None).await; // New call with config = None
         match res {
             Ok(response) => {
                 assert!(!response.is_empty());

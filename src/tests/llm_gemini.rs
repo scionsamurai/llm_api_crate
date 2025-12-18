@@ -1,13 +1,16 @@
+// src/tests/llm_gemini.rs
 #[cfg(test)]
 mod tests {
     use crate::llm::{Access, LLM};
     use crate::structs::general::Message;
+    use crate::config::LlmConfig;
 
     #[tokio::test]
     async fn test_send_single_message_gemini() {
         let llm: LLM = LLM::Gemini;
 
-        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None).await;
+        // Test without config
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None, None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);
@@ -15,6 +18,20 @@ mod tests {
             }
             Err(err) => {
                 println!("Error: {}", err);
+                assert!(false, "Call to Gemini API failed");
+            }
+        }
+
+        // Test with config
+        let config = LlmConfig::new().with_temperature(0.5);
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None, Some(&config)).await;
+        match res {
+            Ok(response) => {
+                println!("Ok with config: {}", &response);
+                assert!(!response.is_empty(), "Response should not be empty");
+            }
+            Err(err) => {
+                println!("Error with config: {}", err);
                 assert!(false, "Call to Gemini API failed");
             }
         }
@@ -38,7 +55,8 @@ mod tests {
             },
         ];
 
-        let res = llm.send_convo_message(messages, None).await;
+        // Test without config
+        let res = llm.send_convo_message(messages.clone(), None, None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response);
@@ -46,6 +64,20 @@ mod tests {
             }
             Err(err) => {
                 println!("Error: {}", err);
+                assert!(false, "Call to Gemini API failed");
+            }
+        }
+
+        // Test with config
+        let config = LlmConfig::new().with_thinking_budget(1024);
+        let res = llm.send_convo_message(messages, None, Some(&config)).await;
+        match res {
+            Ok(response) => {
+                println!("Ok with config: {}", &response);
+                assert!(!response.is_empty(), "Response should not be empty");
+            }
+            Err(err) => {
+                println!("Error with config: {}", err);
                 assert!(false, "Call to Gemini API failed");
             }
         }
