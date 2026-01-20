@@ -4,9 +4,33 @@ use std::collections::HashMap;
 
 use crate::structs::general::Content;
 
+// New: Struct for generation configuration
+#[derive(Debug, Serialize)]
+pub struct GenerationConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    #[serde(rename = "thinkingBudget", skip_serializing_if = "Option::is_none")]
+    pub thinking_budget: Option<i32>,
+    // Add other generation config options here if needed, e.g., top_p, top_k, candidate_count
+}
+
+// New: Struct for tools (like google_search)
+#[derive(Debug, Serialize)]
+pub struct Tool {
+    // google_search tool is an empty object, so use serde_json::Value to represent {}
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub google_search: Option<serde_json::Value>, 
+    // Add other tool types here if needed
+}
+
+// Updated: GeminiRequest now includes generationConfig and tools
 #[derive(Debug, Serialize)]
 pub struct GeminiRequest {
     pub contents: Vec<Content>,
+    #[serde(rename = "generationConfig", skip_serializing_if = "Option::is_none")]
+    pub generation_config: Option<GenerationConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +63,23 @@ pub struct TokenDetails {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct GroundingMetadata {
+    #[serde(rename = "webSearchQueries")]
+    pub web_search_queries: Option<Vec<String>>,
+    #[serde(rename = "searchEntryPoint")]
+    pub search_entry_point: Option<SearchEntryPoint>,
+    // Add other grounding fields if they exist in the response and you need them
+    // pub groundingChunks: Option<Vec<GroundingChunk>>,
+    // pub groundingSupports: Option<Vec<GroundingSupport>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchEntryPoint {
+    #[serde(rename = "renderedContent")]
+    pub rendered_content: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Candidate {
     pub content: Content,
     #[serde(rename = "finishReason")]
@@ -47,6 +88,8 @@ pub struct Candidate {
     pub avg_log_probs: Option<f64>,
     pub index: Option<usize>,
     pub safety_ratings: Option<Vec<SafetyRating>>,
+    #[serde(rename = "groundingMetadata")]
+    pub grounding_metadata: Option<GroundingMetadata>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -4,6 +4,7 @@
 pub struct LlmConfig {
     pub temperature: Option<f64>,
     pub thinking_budget: Option<i32>,
+    pub grounding_with_search: Option<bool>, // New option
     // Add other configuration options here
 }
 
@@ -19,6 +20,11 @@ impl LlmConfig {
 
     pub fn with_thinking_budget(mut self, thinking_budget: i32) -> Self {
         self.thinking_budget = Some(thinking_budget);
+        self
+    }
+
+    pub fn with_grounding_with_search(mut self, grounding_with_search: bool) -> Self {
+        self.grounding_with_search = Some(grounding_with_search);
         self
     }
 }

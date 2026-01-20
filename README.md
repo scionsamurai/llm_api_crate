@@ -70,6 +70,7 @@ The `LlmConfig` struct allows you to configure provider-specific settings for th
 pub struct LlmConfig {
     pub temperature: Option<f64>,
     pub thinking_budget: Option<i32>,
+    pub grounding_with_search: Option<bool>, // New: Enable grounding with Google Search for Gemini
     // Add other configuration options here
 }
 
@@ -87,8 +88,17 @@ impl LlmConfig {
         self.thinking_budget = Some(thinking_budget);
         self
     }
+
+    pub fn with_grounding_with_search(mut self, grounding_with_search: bool) -> Self {
+        self.grounding_with_search = Some(grounding_with_search);
+        self
+    }
 }
 ```
+**Grounding with Google Search (Gemini Only):**
+
+When `grounding_with_search` is set to `true` in the `LlmConfig` for Gemini models, the model can automatically use Google Search to access real-time web content. This helps increase factual accuracy, reduce hallucinations, and provide citations for its responses.
+
 
 **Example Usage:**
 
@@ -105,6 +115,9 @@ let config = Some(LlmConfig::new().with_thinking_budget(1024));
 let config = Some(LlmConfig::new()
     .with_thinking_budget(2048)
     .with_temperature(0.7));
+
+// With Google Search grounding enabled for Gemini
+let config = Some(LlmConfig::new().with_grounding_with_search(true));
 ```
 
 ### Loading API Credentials with dotenv
@@ -192,20 +205,35 @@ async fn main() {
     ];
 
     // Send the conversation messages to the LLM with no config
-    let response = llm.send_convo_message(messages, None, None).await;
+    let response = llm.send_convo_message(messages.clone(), None, None).await; // Clone messages for second use
 
     match response {
         Ok(code) => println!("Code: {}", code),
         Err(err) => eprintln!("Error: {}", err),
     }
 
-    // Send the conversation messages to the LLM with a config
-    let config = Some(LlmConfig::new().with_thinking_budget(2048));
-    let response = llm.send_convo_message(messages, None, config.as_ref()).await;
+    // Send the conversation messages to the LLM with a config (e.g., thinking budget)
+    let config_budget = Some(LlmConfig::new().with_thinking_budget(2048));
+    let response_budget = llm.send_convo_message(messages.clone(), None, config_budget.as_ref()).await; // Clone messages again
 
-    match response {
-        Ok(code) => println!("Code: {}", code),
-        Err(err) => eprintln!("Error: {}", err),
+    match response_budget {
+        Ok(code) => println!("Code with budget: {}", code),
+        Err(err) => eprintln!("Error with budget: {}", err),
+    }
+
+    // Send a conversation message to Gemini with Google Search grounding enabled
+    let grounding_messages = vec![
+        Message {
+            role: "user".to_string(),
+            content: "Who won the FIFA World Cup in 2022?".to_string(),
+        },
+    ];
+    let config_grounding = Some(LlmConfig::new().with_grounding_with_search(true));
+    let response_grounding = llm.send_convo_message(grounding_messages, None, config_grounding.as_ref()).await;
+
+    match response_grounding {
+        Ok(answer) => println!("\nAnswer with Grounding: {}", answer),
+        Err(err) => eprintln!("\nError with Grounding: {}", err),
     }
 }
 ```

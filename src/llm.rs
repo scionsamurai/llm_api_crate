@@ -62,7 +62,14 @@ impl Access for LLM {
                     role: "user".to_string(),
                     content: message.to_string(),
                 };
-                call_gemini(vec![gemini_message], model, config).await // Pass config
+                // Call call_gemini, then extract the text from the GeminiResponse
+                let gemini_response = call_gemini(vec![gemini_message], model, config).await?;
+                gemini_response.candidates.into_iter().next()
+                    .and_then(|candidate| candidate.content.parts.into_iter().next())
+                    .map(|part| part.text)
+                    .ok_or_else(|| Box::new(GeneralError {
+                        message: "Gemini response did not contain expected text content.".to_string(),
+                    }) as Box<dyn std::error::Error + Send + Sync>)
             }
             LLM::Anthropic => {
                 let anthropic_message: Message = Message {
@@ -93,7 +100,14 @@ impl Access for LLM {
                     })
                     .collect();
     
-                conversation_gemini_call(gemini_messages, model, config).await // Pass config
+                // Call conversation_gemini_call, then extract the text from the GeminiResponse
+                let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
+                gemini_response.candidates.into_iter().next()
+                    .and_then(|candidate| candidate.content.parts.into_iter().next())
+                    .map(|part| part.text)
+                    .ok_or_else(|| Box::new(GeneralError {
+                        message: "Gemini response did not contain expected text content.".to_string(),
+                    }) as Box<dyn std::error::Error + Send + Sync>)
             }
             LLM::Anthropic => call_anthropic(messages).await,
         }
