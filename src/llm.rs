@@ -102,12 +102,18 @@ impl Access for LLM {
     
                 // Call conversation_gemini_call, then extract the text from the GeminiResponse
                 let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
-                gemini_response.candidates.into_iter().next()
-                    .and_then(|candidate| candidate.content.parts.into_iter().next())
-                    .map(|part| part.text)
+                let full_text = gemini_response.candidates.into_iter().next()
+                    .map(|candidate| {
+                        candidate.content.parts.into_iter()
+                            .map(|part| part.text)
+                            .collect::<Vec<String>>()
+                            .join("") // Join all parts into one cohesive string
+                    })
                     .ok_or_else(|| Box::new(GeneralError {
-                        message: "Gemini response did not contain expected text content.".to_string(),
-                    }) as Box<dyn std::error::Error + Send + Sync>)
+                        message: "Gemini response did not contain any candidates.".to_string(),
+                    }) as Box<dyn std::error::Error + Send + Sync>)?;
+
+                Ok(full_text)
             }
             LLM::Anthropic => call_anthropic(messages).await,
         }
