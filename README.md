@@ -1,40 +1,52 @@
 # llm_api_access
 
-The `llm_api_access` crate provides a unified way to interact with different large language models (LLMs) like OpenAI, Gemini, and Anthropic.
+The `llm_api_access` crate provides a unified way to interact with different large language models (LLMs) like OpenAI, Gemini, Anthropic, and local Llama servers. 
 
 ## Current Status
 
-This crate is used to power an open-source coding assistant currently in active development. Gemini has been the main test target; OpenAI (including embeddings) and Anthropic are supported but have been exercised less. Development is self encouraged so updates can be far and few between, open an issue on github if you want something specific.
+This crate is used to power an open-source coding assistant currently in active development. Gemini has been the main test target; OpenAI (including embeddings), Anthropic, and Llama Server are supported. Recent updates include unified support for "thinking" or "reasoning" blocks from models like OpenAI's `o1`/`o3`, Anthropic's Claude 3.7, and Google's Gemini 2.0 Flash Thinking. Development is self-encouraged so updates can be far and few between, open an issue on github if you want something specific.
+
+### Unified Response Structure
+
+To support models that output both a thought process and a final answer, responses from the text generation methods are returned as an `LlmResponse`:
+
+```rust
+pub struct LlmResponse {
+    pub text: String,
+    pub reasoning: Option<String>,
+}
+```
 
 ### LLM Enum
 
 This enum represents the supported LLM providers:
 
-- `OpenAI`: Represents the OpenAI language model.
-- `Gemini`: Represents the Gemini language model.
-- `Anthropic`: Represents the Anthropic language model.
+- `OpenAI`: Represents the OpenAI language models.
+- `Gemini`: Represents the Gemini language models.
+- `Anthropic`: Represents the Anthropic language models.
+- `LlamaServer`: Represents a local or remote Llama-compatible server.
 
 ### Access Trait
 
 The `Access` trait defines asynchronous methods for interacting with LLMs:
 
-- `send_single_message`: Sends a single message and returns the generated response.
+- `send_single_message`: Sends a single message and returns the generated structured response.
   ```rust
   async fn send_single_message(
         &self,
         message: &str,
         model: Option<&str>,
         config: Option<&LlmConfig>,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>;
   ```
-- `send_convo_message`: Sends a list of messages as a conversation and returns the generated response.
+- `send_convo_message`: Sends a list of messages as a conversation and returns the generated structured response.
   ```rust
   async fn send_convo_message(
         &self,
         messages: Vec<Message>,
         model: Option<&str>,
         config: Option<&LlmConfig>,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>;
   ```
 - `get_model_info`: Gets information about a specific LLM model.
   ```rust
@@ -70,35 +82,18 @@ The `LlmConfig` struct allows you to configure provider-specific settings for th
 pub struct LlmConfig {
     pub temperature: Option<f64>,
     pub thinking_budget: Option<i32>,
-    pub grounding_with_search: Option<bool>, // New: Enable grounding with Google Search for Gemini
-    // Add other configuration options here
-}
-
-impl LlmConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_temperature(mut self, temperature: f64) -> Self {
-        self.temperature = Some(temperature);
-        self
-    }
-
-    pub fn with_thinking_budget(mut self, thinking_budget: i32) -> Self {
-        self.thinking_budget = Some(thinking_budget);
-        self
-    }
-
-    pub fn with_grounding_with_search(mut self, grounding_with_search: bool) -> Self {
-        self.grounding_with_search = Some(grounding_with_search);
-        self
-    }
+    pub grounding_with_search: Option<bool>, // Enable grounding with Google Search for Gemini
+    pub stream: Option<bool>,
+    pub max_tokens: Option<u32>,       
+    pub stop: Option<Vec<String>,
+    pub cache_prompt: Option<bool>,
+    pub json_schema: Option<serde_json::Value>,    
+    pub top_k: Option<u32>,
+    pub top_p: Option<f32>,
 }
 ```
-**Grounding with Google Search (Gemini Only):**
-
-When `grounding_with_search` is set to `true` in the `LlmConfig` for Gemini models, the model can automatically use Google Search to access real-time web content. This helps increase factual accuracy, reduce hallucinations, and provide citations for its responses.
-
+**Thinking Budgets & Reasoning:**
+Passing a `thinking_budget` automatically configures the underlying provider (like Anthropic) to return reasoning tokens before the final text answer. These reasoning tokens will be populated in the `reasoning` field of the returned `LlmResponse`. 
 
 **Example Usage:**
 
@@ -108,16 +103,16 @@ use llm_api_access::config::LlmConfig;
 // Default usage (no config)
 let config = None;
 
-// With thinking budget
+// With thinking budget (Enables reasoning blocks on compatible models)
 let config = Some(LlmConfig::new().with_thinking_budget(1024));
-
-// With multiple options
-let config = Some(LlmConfig::new()
-    .with_thinking_budget(2048)
-    .with_temperature(0.7));
 
 // With Google Search grounding enabled for Gemini
 let config = Some(LlmConfig::new().with_grounding_with_search(true));
+
+// Universal parameters
+let config = Some(LlmConfig::new()
+    .with_temperature(0.7)
+    .with_max_tokens(2048));
 ```
 
 ### Loading API Credentials with dotenv
@@ -128,19 +123,11 @@ The `llm_api_access` crate uses the `dotenv` library to securely load API creden
 
 ```
 OPEN_AI_ORG=your_openai_org
-OPENAI_API_KEY=your_openai_api_key
+OPEN_AI_KEY=your_openai_api_key
 GEMINI_API_KEY=your_gemini_api_key
 ANTHROPIC_API_KEY=your_anthropic_api_key
+LLAMA_SERVER_URL=http://127.0.0.1:8080
 ```
-
-**Steps:**
-
-1. **Create `.env` File:** Create a file named `.env` at the root of your Rust project directory.
-2. **Add API Keys:** Fill in the `.env` file with the following format, replacing placeholders with your actual API keys.
-
-**Important Note:**
-
-* **Never** commit your `.env` file to version control systems like Git. It contains sensitive information like API keys.
 
 ## Example Usage
 
@@ -148,40 +135,43 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 
 ```rust
 use llm_api_access::llm::{Access, LLM};
-use llm_api_access::config::LlmConfig; // Import LlmConfig
+use llm_api_access::config::LlmConfig; 
 
 #[tokio::main]
 async fn main() {
     // Create an instance of the OpenAI LLM
     let llm = LLM::OpenAI;
 
-    // Send a single message to the LLM with no config
+    // Send a single message to the LLM
     let response = llm.send_single_message("Tell me a joke about programmers", None, None).await;
 
     match response {
-        Ok(joke) => println!("Joke: {}", joke),
+        Ok(res) => println!("Joke: {}", res.text),
         Err(err) => eprintln!("Error: {}", err),
     }
 
-    //Send a single message to the LLM with a config
-    let config = Some(LlmConfig::new().with_temperature(0.7));
-    let response = llm.send_single_message("Tell me a joke about programmers", None, config.as_ref()).await;
+    // Send a message asking for reasoning to a thinking model
+    let config = Some(LlmConfig::new().with_thinking_budget(1024));
+    let response = llm.send_single_message("Calculate how many ping pong balls fit in a bus.", Some("o3-mini"), config.as_ref()).await;
 
     match response {
-        Ok(joke) => println!("Joke: {}", joke),
+        Ok(res) => {
+            if let Some(reasoning) = res.reasoning {
+                println!("Thought Process:\n{}", reasoning);
+            }
+            println!("Final Answer:\n{}", res.text);
+        },
         Err(err) => eprintln!("Error: {}", err),
     }
 }
 ```
-
-This example creates an instance of the `LLM::OpenAI` provider and sends a single message using the `send_single_message` method. It then matches the result, printing the generated joke or an error message if an error occurred.
 
 ### `send_convo_message` Example
 
 ```rust
 use llm_api_access::llm::{Access, LLM};
 use llm_api_access::structs::general::Message;
-use llm_api_access::config::LlmConfig; // Import LlmConfig
+use llm_api_access::config::LlmConfig; 
 
 #[tokio::main]
 async fn main() {
@@ -192,53 +182,27 @@ async fn main() {
     let messages = vec![
         Message {
             role: "user".to_string(),
-            content: "You are a helpful coding assistant.".to_string(),
+            content: "You are a helpful coding assistant.".into(),
         },
         Message {
             role: "model".to_string(),
-            content: "You got it! I am ready to assist!".to_string(),
+            content: "You got it! I am ready to assist!".into(),
         },
         Message {
             role: "user".to_string(),
-            content: "Generate a rust function that reverses a string.".to_string(),
+            content: "Generate a rust function that reverses a string.".into(),
         },
     ];
 
-    // Send the conversation messages to the LLM with no config
-    let response = llm.send_convo_message(messages.clone(), None, None).await; // Clone messages for second use
+    // Send the conversation messages
+    let response = llm.send_convo_message(messages.clone(), None, None).await;
 
     match response {
-        Ok(code) => println!("Code: {}", code),
+        Ok(res) => println!("Code: {}", res.text),
         Err(err) => eprintln!("Error: {}", err),
-    }
-
-    // Send the conversation messages to the LLM with a config (e.g., thinking budget)
-    let config_budget = Some(LlmConfig::new().with_thinking_budget(2048));
-    let response_budget = llm.send_convo_message(messages.clone(), None, config_budget.as_ref()).await; // Clone messages again
-
-    match response_budget {
-        Ok(code) => println!("Code with budget: {}", code),
-        Err(err) => eprintln!("Error with budget: {}", err),
-    }
-
-    // Send a conversation message to Gemini with Google Search grounding enabled
-    let grounding_messages = vec![
-        Message {
-            role: "user".to_string(),
-            content: "Who won the FIFA World Cup in 2022?".to_string(),
-        },
-    ];
-    let config_grounding = Some(LlmConfig::new().with_grounding_with_search(true));
-    let response_grounding = llm.send_convo_message(grounding_messages, None, config_grounding.as_ref()).await;
-
-    match response_grounding {
-        Ok(answer) => println!("\nAnswer with Grounding: {}", answer),
-        Err(err) => eprintln!("\nError with Grounding: {}", err),
     }
 }
 ```
-
-**Note:** This example requires API keys and configuration for the Gemini LLM provider.
 
 ## Embeddings
 

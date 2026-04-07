@@ -10,29 +10,35 @@ mod tests {
         let llm: LLM = LLM::Gemini;
 
         // Test without config
-        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None, None).await;
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limerick.", None, None).await;
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response);
-                assert!(!response.is_empty(), "Response should not be empty");
+                println!("Ok: {}", &response.text);
+                if let Some(reasoning) = &response.reasoning {
+                    println!("Reasoning: {}", reasoning);
+                }
+                assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
                 println!("Error: {}", err);
-                assert!(false, "Call to Gemini API failed");
+                panic!("Call to Gemini API failed: {}", err);
             }
         }
 
         // Test with config
         let config = LlmConfig::new().with_temperature(0.5);
-        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None, Some(&config)).await;
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limerick.", None, Some(&config)).await;
         match res {
             Ok(response) => {
-                println!("Ok with config: {}", &response);
-                assert!(!response.is_empty(), "Response should not be empty");
+                println!("Ok with config: {}", &response.text);
+                if let Some(reasoning) = &response.reasoning {
+                    println!("Reasoning with config: {}", reasoning);
+                }
+                assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
                 println!("Error with config: {}", err);
-                assert!(false, "Call to Gemini API failed");
+                panic!("Call to Gemini API with config failed: {}", err);
             }
         }
     }
@@ -59,26 +65,32 @@ mod tests {
         let res = llm.send_convo_message(messages.clone(), None, None).await;
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response);
-                assert!(!response.is_empty(), "Response should not be empty");
+                println!("Ok: {}", &response.text);
+                if let Some(reasoning) = &response.reasoning {
+                    println!("Reasoning: {}", reasoning);
+                }
+                assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
                 println!("Error: {}", err);
-                assert!(false, "Call to Gemini API failed");
+                panic!("Call to Gemini API failed: {}", err);
             }
         }
 
         // Test with config
-        let config = LlmConfig::new(); // .with_thinking_budget(1024); // took thinking budget off test due to default model not supporting it
+        let config = LlmConfig::new(); 
         let res = llm.send_convo_message(messages, None, Some(&config)).await;
         match res {
             Ok(response) => {
-                println!("Ok with config: {}", &response);
-                assert!(!response.is_empty(), "Response should not be empty");
+                println!("Ok with config: {}", &response.text);
+                if let Some(reasoning) = &response.reasoning {
+                    println!("Reasoning with config: {}", reasoning);
+                }
+                assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
                 println!("Error with config: {}", err);
-                assert!(false, "Call to Gemini API failed");
+                panic!("Call to Gemini API with config failed: {}", err);
             }
         }
     }
@@ -96,7 +108,7 @@ mod tests {
             }
             Err(err) => {
                 println!("Error: {}", err);
-                assert!(false);
+                panic!("Failed to get model info: {}", err);
             }
         }
     }
@@ -112,7 +124,7 @@ mod tests {
             }
             Err(err) => {
                 println!("Error: {}", err);
-                assert!(false, "Failed to list models");
+                panic!("Failed to list models: {}", err);
             }
         }
     }
@@ -130,7 +142,7 @@ mod tests {
             }
             Err(err) => {
                 println!("Error: {}", err);
-                assert!(false, "Failed to count tokens");
+                panic!("Failed to count tokens: {}", err);
             }
         }
     }

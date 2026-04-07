@@ -8,7 +8,6 @@ pub struct ChatCompletion {
     pub model: String,
     pub messages: Vec<Message>,
     
-    // Make these optional so we skip serializing if they aren't provided
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     
@@ -17,6 +16,9 @@ pub struct ChatCompletion {
     
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_completion_tokens: Option<u32>,
     
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop: Option<Vec<String>>,
@@ -27,12 +29,11 @@ pub struct ChatCompletion {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f32>,
     
-    // Some Llama-server specific additions to the OpenAI compatible endpoint
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_prompt: Option<bool>,
     
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<Value>, // Mapped from json_schema
+    pub response_format: Option<Value>, 
 }
 
 #[derive(Debug, Serialize)]

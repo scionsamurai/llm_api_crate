@@ -1,6 +1,13 @@
 // src/structs/general.rs
 use serde::{Deserialize, Serialize};
 
+// --- New Unified Response Type ---
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmResponse {
+    pub text: String,
+    pub reasoning: Option<String>,
+}
+
 // --- New Multimodal Support ---
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
@@ -66,7 +73,10 @@ pub struct Content {
     pub parts: Vec<Part>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Part {
-    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thought: Option<String>, // Added for reasoning support
 }

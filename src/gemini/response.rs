@@ -23,7 +23,7 @@ pub fn handle_gemini_error(response_body: &str) -> Result<String, Box<dyn std::e
     let gemini_response: Result<GeminiResponse, _> = serde_json::from_str(&response_body);
 
     match gemini_response {
-        Ok(response) => Ok(response.candidates[0].content.parts[0].text.clone()),
+        Ok(response) => Ok(response.candidates[0].content.parts[0].text.clone().unwrap()),
         Err(_) => {
             // Try to parse the response as a GeminiErrorResponse
             let error_response: Result<GeminiErrorResponse, _> =

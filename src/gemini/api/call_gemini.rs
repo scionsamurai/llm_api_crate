@@ -1,11 +1,11 @@
 // src/gemini/api/call_gemini.rs
 use std::env;
 use dotenv::dotenv;
-use serde_json::{json, Map, Value}; // Map and Value are less needed now
+use serde_json::json; // Removed Map, Value
 
 use crate::errors::GeneralError;
 use crate::structs::general::{ Message, Content, Part };
-use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool}; // Import new types
+use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool};
 use crate::gemini::request::gemini_request;
 use crate::gemini::response::parse_gemini_response;
 use crate::gemini::types::GeminiResponse;
@@ -15,15 +15,17 @@ pub async fn call_gemini(
     messages: Vec<Message>,
     model: Option<&str>,
     config: Option<&LlmConfig>,
-) -> Result<GeminiResponse, Box<dyn std::error::Error + Send + Sync>> { // CHANGE RETURN TYPE
+) -> Result<GeminiResponse, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
-    let DEFAULT_GEMINI_MODEL: String = env::var("DEFAULT_GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.5-flash".to_string());
+    // Fixed snake_case warning
+    let default_gemini_model: String = env::var("DEFAULT_GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.5-flash".to_string());
 
     let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GEMINI API KEY not found in environment variables".to_string(),
     })?;
 
-    let model_name = model.unwrap_or(&DEFAULT_GEMINI_MODEL);
+    // Updated reference to snake_case variable
+    let model_name = model.unwrap_or(&default_gemini_model);
     let url: String = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
         model_name
@@ -34,7 +36,8 @@ pub async fn call_gemini(
         .map(|msg| Content {
             role: msg.role.clone(),
             parts: vec![Part {
-                text: msg.content.extract_text(),
+                text: Some(msg.content.extract_text()),
+                thought: None,
             }],
         })
         .collect();
@@ -48,7 +51,7 @@ pub async fn call_gemini(
             thinking_budget: None,
         };
 
-        let mut config_has_options = false; // Flag to check if any generation config is set
+        let mut config_has_options = false;
 
         if let Some(thinking_budget) = cfg.thinking_budget {
             current_gen_config.thinking_budget = Some(thinking_budget);
@@ -64,13 +67,11 @@ pub async fn call_gemini(
             generation_config_option = Some(current_gen_config);
         }
 
-        // Add "tools" for grounding with Google Search
         if cfg.grounding_with_search.unwrap_or(false) {
             tools_option = Some(vec![Tool { google_search: Some(json!({})) }]);
         }
     }
 
-    // Construct the GeminiRequest struct with all relevant fields
     let request = GeminiRequest {
         contents,
         generation_config: generation_config_option,
@@ -80,5 +81,5 @@ pub async fn call_gemini(
     let response = gemini_request(&url, &api_key, &request, None).await?;
     let gemini_response: GeminiResponse = parse_gemini_response(response).await?;
 
-    Ok(gemini_response) // Return the full GeminiResponse
+    Ok(gemini_response)
 }

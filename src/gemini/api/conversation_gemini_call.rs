@@ -2,29 +2,30 @@
 use reqwest::header::{HeaderMap, HeaderValue};
 use std::env;
 use dotenv::dotenv;
-use serde_json::{json, Map, Value};
+use serde_json::json; // Removed Map, Value
 
 use crate::errors::GeneralError;
 use crate::structs::general::Content;
-use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool, GeminiResponse}; // Import new types
+use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool, GeminiResponse};
 use crate::gemini::request::gemini_request;
-use crate::gemini::response::parse_gemini_response; // Use parse_gemini_response
+use crate::gemini::response::parse_gemini_response;
 use crate::config::LlmConfig;
-
 
 pub async fn conversation_gemini_call(
     messages: Vec<Content>,
     model: Option<&str>,
     config: Option<&LlmConfig>,
-) -> Result<GeminiResponse, Box<dyn std::error::Error + Send + Sync>> { // CHANGE RETURN TYPE
+) -> Result<GeminiResponse, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
-    let DEFAULT_GEMINI_MODEL: String = env::var("DEFAULT_GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.5-flash".to_string());
+    // Fixed snake_case warning
+    let default_gemini_model: String = env::var("DEFAULT_GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.5-flash".to_string());
 
     let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GOOGLE API KEY not found in environment variables".to_string(),
     })?;
 
-    let model_name = model.unwrap_or(&DEFAULT_GEMINI_MODEL);
+    // Updated reference to snake_case variable
+    let model_name = model.unwrap_or(&default_gemini_model);
     let url: String = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
         model_name
@@ -60,7 +61,6 @@ pub async fn conversation_gemini_call(
         }
     }
 
-    // Construct the GeminiRequest struct with all relevant fields
     let request = GeminiRequest {
         contents: messages,
         generation_config: generation_config_option,
@@ -71,7 +71,6 @@ pub async fn conversation_gemini_call(
     headers.insert("Content-Type", HeaderValue::from_static("application/json"));
 
     let response = gemini_request(&url, &api_key, &request, Some(headers)).await?;
-    // Directly parse the response instead of using handle_gemini_error for successful responses
     let gemini_response: GeminiResponse = parse_gemini_response(response).await?;
     Ok(gemini_response)
 }

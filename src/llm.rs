@@ -5,7 +5,7 @@ use crate::gemini::{call_gemini, conversation_gemini_call, get_gemini_model_info
 use crate::anthropic::call_anthropic;
 use crate::models::gemini::ModelInfo;
 use crate::errors::GeneralError;
-use crate::structs::general::{Message, Content, Part};
+use crate::structs::general::{Message, Content, Part, LlmResponse}; // Added LlmResponse
 use crate::config::LlmConfig; // Import LlmConfig
 
 pub enum LLM {
@@ -21,14 +21,14 @@ pub trait Access {
         &self,
         message: &str,
         model: Option<&str>,
-        config: Option<&LlmConfig>, // NEW: optional config parameter
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
+        config: Option<&LlmConfig>,
+    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>; // Changed return type
     async fn send_convo_message(
         &self,
         messages: Vec<Message>,
         model: Option<&str>,
-        config: Option<&LlmConfig>, // NEW: optional config parameter
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
+        config: Option<&LlmConfig>,
+    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>; // Changed return type
     async fn get_model_info(
         &self,
         model: &str,
@@ -48,43 +48,54 @@ impl Access for LLM {
         &self,
         message: &str,
         model: Option<&str>,
-        config: Option<&LlmConfig>, // NEW: optional config parameter
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        config: Option<&LlmConfig>,
+    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::OpenAI => {
                 let openai_message: Message = Message {
                     role: "user".to_string(),
                     content: message.into(),
                 };
-                call_gpt(vec![openai_message]).await
+                call_gpt(vec![openai_message], model, config).await 
             }
             LLM::Gemini => {
                 let gemini_message: Message = Message {
                     role: "user".to_string(),
                     content: message.into(),
                 };
-                // Call call_gemini, then extract the text from the GeminiResponse
                 let gemini_response = call_gemini(vec![gemini_message], model, config).await?;
-                gemini_response.candidates.into_iter().next()
-                    .and_then(|candidate| candidate.content.parts.into_iter().next())
-                    .map(|part| part.text)
-                    .ok_or_else(|| Box::new(GeneralError {
-                        message: "Gemini response did not contain expected text content.".to_string(),
-                    }) as Box<dyn std::error::Error + Send + Sync>)
+                
+                // Extract text and reasoning by iterating through all parts
+                let candidate = gemini_response.candidates.into_iter().next()
+                    .ok_or_else(|| Box::new(GeneralError { message: "No Gemini candidates".into() }) as Box<dyn std::error::Error + Send + Sync>)?;
+                
+                let mut text = String::new();
+                let mut reasoning = None;
+
+                for part in candidate.content.parts {
+                    if let Some(t) = part.text {
+                        text.push_str(&t);
+                    }
+                    if let Some(th) = part.thought {
+                        reasoning = Some(th);
+                    }
+                }
+
+                Ok(LlmResponse { text, reasoning })
             }
             LLM::Anthropic => {
                 let anthropic_message: Message = Message {
                     role: "user".to_string(),
                     content: message.into(),
                 };
-                call_anthropic(vec![anthropic_message]).await
+                call_anthropic(vec![anthropic_message], model, config).await 
             }
             LLM::LlamaServer => {
                 let llama_message: Message = Message {
                     role: "user".to_string(),
                     content: message.into(),
                 };
-                crate::llama_server::call_llama_openai_compat(vec![llama_message], config).await
+                crate::llama_server::call_llama_openai_compat(vec![llama_message], model, config).await
             }
         }
     }
@@ -93,38 +104,43 @@ impl Access for LLM {
         &self,
         messages: Vec<Message>,
         model: Option<&str>,
-        config: Option<&LlmConfig>, // NEW: optional config parameter
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        config: Option<&LlmConfig>,
+    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>> {
         match self {
-            LLM::OpenAI => call_gpt(messages).await,
+            LLM::OpenAI => call_gpt(messages, model, config).await,
             LLM::Gemini => {
                 let gemini_messages: Vec<Content> = messages
                     .into_iter()
                     .map(|msg| Content {
                         role: msg.role,
                         parts: vec![Part {
-                            text: msg.content.extract_text(),
+                            text: Some(msg.content.extract_text()),
+                            thought: None,
                         }],
                     })
                     .collect();
 
-                // Call conversation_gemini_call, then extract the text from the GeminiResponse
                 let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
-                let full_text = gemini_response.candidates.into_iter().next()
-                    .map(|candidate| {
-                        candidate.content.parts.into_iter()
-                            .map(|part| part.text)
-                            .collect::<Vec<String>>()
-                            .join("") // Join all parts into one cohesive string
-                    })
-                    .ok_or_else(|| Box::new(GeneralError {
-                        message: "Gemini response did not contain any candidates.".to_string(),
-                    }) as Box<dyn std::error::Error + Send + Sync>)?;
+                
+                let candidate = gemini_response.candidates.into_iter().next()
+                    .ok_or_else(|| Box::new(GeneralError { message: "No Gemini candidates".into() }) as Box<dyn std::error::Error + Send + Sync>)?;
 
-                Ok(full_text)
+                let mut text = String::new();
+                let mut reasoning = None;
+
+                for part in candidate.content.parts {
+                    if let Some(t) = part.text {
+                        text.push_str(&t);
+                    }
+                    if let Some(th) = part.thought {
+                        reasoning = Some(th);
+                    }
+                }
+
+                Ok(LlmResponse { text, reasoning })
             }
-            LLM::Anthropic => call_anthropic(messages).await,
-            LLM::LlamaServer => crate::llama_server::call_llama_openai_compat(messages, config).await,
+            LLM::Anthropic => call_anthropic(messages, model, config).await, 
+            LLM::LlamaServer => crate::llama_server::call_llama_openai_compat(messages, model, config).await,
         }
     }
 

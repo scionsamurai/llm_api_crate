@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize)]
 pub struct LlamaCompletionRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>, // <-- Added model field
+    
     pub prompt: String,
     
     #[serde(skip_serializing_if = "Option::is_none")]

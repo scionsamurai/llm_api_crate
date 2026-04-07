@@ -1,3 +1,4 @@
+// src/tests/openai.rs
 
 #[cfg(test)]
 mod tests {
@@ -11,9 +12,11 @@ mod tests {
             content: MessageContent::Text("Hello, can you tell me a joke?".to_string()),
         };
         let messages = vec![user_message];
-        let res = call_gpt(messages).await;
+        
+        // UPDATED: Added None, None for model and config
+        let res = call_gpt(messages, None, None).await;
         match res {
-            Ok(response) => assert!(!response.is_empty(), "Response should not be empty"),
+            Ok(response) => assert!(!response.text.is_empty(), "Response should not be empty"),
             Err(err) => panic!("Call to OpenAI API failed: {}", err),
         }
     }
@@ -29,22 +32,57 @@ mod tests {
             content: MessageContent::Text("Hello, can you write a python function that reverses a string?".to_string()),
         };
         let mut messages = vec![system_message, user_message_1];
-        let res = call_gpt(messages.clone()).await;
+        
+        // UPDATED: Added None, None for model and config
+        let res = call_gpt(messages.clone(), None, None).await;
         match res {
             Ok(response) => {
-                assert!(!response.is_empty(), "Response should not be empty");
+                assert!(!response.text.is_empty(), "Response should not be empty");
                 let user_message_2 = Message {
                     role: "user".to_string(),
                     content: MessageContent::Text("Can you also provide an example of how to use that function?".to_string()),
                 };
                 messages.push(user_message_2);
-                let res = call_gpt(messages).await;
+                
+                // UPDATED: Added None, None for model and config
+                let res = call_gpt(messages, None, None).await;
                 match res {
-                    Ok(response) => assert!(!response.is_empty(), "Response should not be empty"),
+                    Ok(response) => assert!(!response.text.is_empty(), "Response should not be empty"),
                     Err(err) => panic!("Call to OpenAI API failed on second prompt: {}", err),
                 }
             }
             Err(err) => panic!("Call to OpenAI API failed on first prompt: {}", err),
+        }
+    }
+
+    // --- NEW TEST: Explicitly test the reasoning implementation ---
+    #[tokio::test]
+    async fn test_call_gpt_reasoning() {
+        let user_message = Message {
+            role: "user".to_string(),
+            content: MessageContent::Text("Calculate how many ping pong balls fit in a Boeing 747. Show your step-by-step math.".to_string()),
+        };
+
+        let messages = vec![user_message];
+
+        // We explicitly test with an o-series model to test reasoning fields
+        // Note: Depending on your API tier, o3-mini may or may not return raw reasoning tokens to the developer, 
+        // but this verifies the struct parses successfully without crashing.
+        let res = call_gpt(messages, Some("o3-mini"), None).await;
+        match res {
+            Ok(response) => {
+                println!("--- response text ---\n{}", response.text);
+                println!("--- response reasoning ---\n{:?}", response.reasoning);
+                
+                assert!(!response.text.is_empty(), "Response text should not be empty");
+                // We won't strictly assert response.reasoning.is_some() because OpenAI sometimes hides 
+                // the raw reasoning string depending on safety/tier restrictions on o1/o3 models,
+                // but we verify the response is formed correctly as an LlmResponse.
+            }
+            Err(err) => {
+                println!("Error: {}", err);
+                assert!(false, "Call to OpenAI API with reasoning model failed");
+            }
         }
     }
 

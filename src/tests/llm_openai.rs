@@ -14,8 +14,8 @@ mod tests {
 
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response);
-                assert!(!response.is_empty(), "Response should not be empty");
+                println!("Ok: {}", &response.text);
+                assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
                 println!("Error: {}", err);
@@ -48,8 +48,8 @@ mod tests {
 
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response);
-                assert!(!response.is_empty(), "Response should not be empty");
+                println!("Ok: {}", &response.text);
+                assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
                 println!("Error: {}", err);

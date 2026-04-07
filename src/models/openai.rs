@@ -4,6 +4,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub struct APIMessage {
     pub content: String,
+    pub reasoning_content: Option<String>, // Added for reasoning support
 }
 
 #[derive(Debug, Deserialize)]

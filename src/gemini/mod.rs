@@ -14,7 +14,6 @@ mod tests {
     use super::*;
     use crate::structs::general::{ Message, Content, Part, MessageContent };
     use crate::config::LlmConfig;
-    use crate::gemini::types::GeminiResponse; // Import GeminiResponse
 
     #[tokio::test]
     async fn test_call_gemini() {
@@ -30,8 +29,8 @@ mod tests {
         match res {
             Ok(gemini_response) => {
                 let res_str = gemini_response.candidates[0].content.parts[0].text.clone();
-                println!("res: {}", res_str);
-                assert!(!res_str.is_empty());
+                println!("res: {}", res_str.as_ref().map_or(false, |text| !text.is_empty()));
+                assert!(res_str.as_ref().map_or(false, |text| !text.is_empty()));
             }
             Err(err) => {
                 println!("Error: {}", err);
@@ -46,19 +45,22 @@ mod tests {
             Content {
                 role: "user".to_string(),
                 parts: vec![Part {
-                    text: "Write the first line of a story about a magic backpack.".to_string(),
+                    text: Some("Write the first line of a story about a magic backpack.".to_string()),
+                    thought: None,
                 }],
             },
             Content {
                 role: "model".to_string(),
                 parts: vec![Part {
-                    text: "In the bustling city of Meadow brook, lived a young girl named Sophie. She was a bright and curious soul with an imaginative mind.".to_string(),
+                    text: Some("In the bustling city of Meadow brook, lived a young girl named Sophie. She was a bright and curious soul with an imaginative mind.".to_string()),
+                    thought: None,
                 }],
             },
             Content {
                 role: "user".to_string(),
                 parts: vec![Part {
-                    text: "Can you set it in a quiet village in 1600s France?".to_string(),
+                    text: Some("Can you set it in a quiet village in 1600s France?".to_string()),
+                    thought: None,
                 }],
             },
         ];
@@ -67,7 +69,7 @@ mod tests {
         match res {
             Ok(gemini_response) => { // Changed 'response' to 'gemini_response'
                 assert!(!gemini_response.candidates.is_empty());
-                assert!(!gemini_response.candidates[0].content.parts[0].text.is_empty());
+                assert!(gemini_response.candidates[0].content.parts[0].text.as_ref().map_or(false, |text| !text.is_empty()));
             }
             Err(err) => {
                 println!("Error: {}", err);
@@ -94,8 +96,8 @@ mod tests {
                 println!("Parsed GeminiResponse: {:?}", gemini_response); // Print the full struct for debugging
                 // Access text for a basic assertion
                 let res_str = gemini_response.candidates.get(0).map(|c| c.content.parts.get(0).map(|p| p.text.clone())).flatten().unwrap_or_default();
-                println!("Extracted text from Gemini API: {}", res_str);
-                assert!(!res_str.is_empty());
+                println!("Extracted text from Gemini API: {:?}", res_str);
+                assert!(!res_str.as_ref().map_or(false, |text| !text.is_empty()));
 
                 // Check for groundingMetadata directly from the parsed response
                 if let Some(candidate) = gemini_response.candidates.get(0) {

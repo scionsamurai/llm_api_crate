@@ -4,27 +4,89 @@ use std::env;
 use dotenv::dotenv;
 
 use crate::errors::GeneralError;
-use crate::structs::general::Message;
+use crate::structs::general::{ Message, MessageContent, LlmResponse };
 use crate::structs::openai::ChatCompletion;
 use crate::models::openai::{APIResponse, ErrorResponse};
 use crate::structs::llama_server::{LlamaCompletionRequest, LlamaCompletionResponse};
 use crate::config::LlmConfig;
 
 fn get_server_url() -> String {
-    dotenv().ok(); // <-- ADD THIS LINE
+    dotenv().ok(); 
     env::var("LLAMA_SERVER_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string())
+}
+
+/// Helper function to manually extract Gemma 4 or DeepSeek reasoning tags 
+/// from raw text, just in case the server doesn't parse them into `reasoning_content`.
+fn parse_raw_reasoning(raw_text: &str) -> (String, Option<String>) {
+    // 1. Check for Gemma 4 tags
+    if let Some(start_idx) = raw_text.find("<|channel>thought") {
+        if let Some(end_idx) = raw_text.find("<channel|>") {
+            let reasoning_start = start_idx + "<|channel>thought".len();
+            let reasoning = raw_text[reasoning_start..end_idx].trim().to_string();
+            
+            let mut text = raw_text[..start_idx].to_string();
+            text.push_str(&raw_text[end_idx + "<channel|>".len()..]);
+            
+            let final_reasoning = if reasoning.is_empty() { None } else { Some(reasoning) };
+            return (text.trim().to_string(), final_reasoning);
+        }
+    }
+
+    // 2. Check for DeepSeek tags (fallback/universal support)
+    if let Some(start_idx) = raw_text.find("<think>") {
+        if let Some(end_idx) = raw_text.find("</think>") {
+            let reasoning_start = start_idx + "<think>".len();
+            let reasoning = raw_text[reasoning_start..end_idx].trim().to_string();
+            
+            let mut text = raw_text[..start_idx].to_string();
+            text.push_str(&raw_text[end_idx + "</think>".len()..]);
+            
+            let final_reasoning = if reasoning.is_empty() { None } else { Some(reasoning) };
+            return (text.trim().to_string(), final_reasoning);
+        }
+    }
+
+    // If no tags found, return the text as-is
+    (raw_text.to_string(), None)
 }
 
 pub async fn call_llama_openai_compat(
     messages: Vec<Message>,
+    model: Option<&str>, 
     config: Option<&LlmConfig>,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>> {
     let base_url = get_server_url();
     let url = format!("{}/v1/chat/completions", base_url);
+    let model_name = model.unwrap_or("gemma-4-26b").to_string();
+
+    let mut processed_messages = messages;
+
+    // --- Inject <|think|> trigger for Gemma 4 ---
+    if let Some(cfg) = config {
+        if cfg.thinking_budget.is_some() {
+            let has_system = processed_messages.first().map(|m| m.role == "system").unwrap_or(false);
+            if has_system {
+                // Prepend to existing system message
+                let first = processed_messages.first_mut().unwrap();
+                if let MessageContent::Text(ref mut text) = first.content {
+                    if !text.starts_with("<|think|>") {
+                        *text = format!("<|think|>\n{}", text);
+                    }
+                }
+            } else {
+                // Insert a new system message if one doesn't exist
+                processed_messages.insert(0, Message {
+                    role: "system".to_string(),
+                    content: MessageContent::Text("<|think|>".to_string()),
+                });
+            }
+        }
+    }
+    println!("Processed Messages for Llama Server:\n{:#?}", processed_messages);
 
     let mut request_body = ChatCompletion {
-        model: "llama-server".to_string(),
-        messages,
+        model: model_name, 
+        messages: processed_messages,
         temperature: None,
         stream: None,
         max_tokens: None,
@@ -33,6 +95,7 @@ pub async fn call_llama_openai_compat(
         top_p: None,
         cache_prompt: None,
         response_format: None,
+        max_completion_tokens: None,
     };
 
     if let Some(cfg) = config {
@@ -54,14 +117,13 @@ pub async fn call_llama_openai_compat(
         .await
         .map_err(|e| {
             Box::new(GeneralError {
-                message: format!("Failed to send request to Llama Server (OpenAI compat): {}", e),
+                message: format!("Failed to send request to Llama Server: {}", e),
             }) as Box<dyn std::error::Error + Send + Sync>
         })?;
 
     let status = res.status();
     let rspns_strng = res.text().await.unwrap_or_default();
 
-    // Check for HTTP errors BEFORE parsing
     if !status.is_success() {
         return Err(Box::new(GeneralError {
             message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
@@ -69,7 +131,22 @@ pub async fn call_llama_openai_compat(
     }
 
     match serde_json::from_str::<APIResponse>(&rspns_strng) {
-        Ok(api_response) => Ok(api_response.choices[0].message.content.clone()),
+        Ok(api_response) => {
+            let message = &api_response.choices[0].message;
+            let raw_text = &message.content;
+            
+            // If the server native-parsed it, use it. Otherwise, run our manual fallback parser!
+            let (final_text, final_reasoning) = if let Some(reasoning) = &message.reasoning_content {
+                (raw_text.clone(), Some(reasoning.clone()))
+            } else {
+                parse_raw_reasoning(raw_text)
+            };
+
+            Ok(LlmResponse { 
+                text: final_text, 
+                reasoning: final_reasoning 
+            })
+        },
         Err(_) => {
             match serde_json::from_str::<ErrorResponse>(&rspns_strng) {
                 Ok(err) => Err(Box::new(GeneralError {
@@ -85,13 +162,26 @@ pub async fn call_llama_openai_compat(
 
 pub async fn call_llama_legacy(
     prompt: String,
+    model: Option<&str>,
     config: Option<&LlmConfig>,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>> { // <-- RETURN TYPE UPDATED
     let base_url = get_server_url();
     let url = format!("{}/completion", base_url);
 
+    let mut processed_prompt = prompt;
+
+    // --- Inject <|think|> trigger for Gemma 4 ---
+    if let Some(cfg) = config {
+        if cfg.thinking_budget.is_some() {
+            if !processed_prompt.starts_with("<|think|>") {
+                processed_prompt = format!("<|think|>\n{}", processed_prompt);
+            }
+        }
+    }
+
     let mut request_body = LlamaCompletionRequest {
-        prompt,
+        model: model.map(|m| m.to_string()), 
+        prompt: processed_prompt,
         n_predict: None,
         temperature: None,
         top_k: None,
@@ -127,7 +217,6 @@ pub async fn call_llama_legacy(
     let status = res.status();
     let rspns_strng = res.text().await.unwrap_or_default();
 
-    // Check for HTTP errors BEFORE parsing
     if !status.is_success() {
         return Err(Box::new(GeneralError {
             message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
@@ -140,5 +229,11 @@ pub async fn call_llama_legacy(
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;
 
-    Ok(parsed.content)
+    // --- Run the manual fallback parser on legacy output! ---
+    let (final_text, final_reasoning) = parse_raw_reasoning(&parsed.content);
+
+    Ok(LlmResponse {
+        text: final_text,
+        reasoning: final_reasoning,
+    })
 }
