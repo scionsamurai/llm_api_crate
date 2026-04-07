@@ -12,7 +12,7 @@ pub use types::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::structs::general::{ Message, Content, Part };
+    use crate::structs::general::{ Message, Content, Part, MessageContent };
     use crate::config::LlmConfig;
     use crate::gemini::types::GeminiResponse; // Import GeminiResponse
 
@@ -20,7 +20,7 @@ mod tests {
     async fn test_call_gemini() {
         let message: Message = Message {
             role: "user".to_string(),
-            content: "Hi there, this is a test. Please generate a limrick about the muppets.".to_string(),
+            content: MessageContent::Text("Hi there, this is a test. Please generate a limrick about the muppets.".to_string()),
         };
 
         let messages: Vec<Message> = vec![message];
@@ -80,7 +80,7 @@ mod tests {
     async fn test_call_gemini_with_grounding() {
         let message: Message = Message {
             role: "user".to_string(),
-            content: "Who is the current president of the United States?".to_string(),
+            content: MessageContent::Text("Who is the current president of the United States?".to_string()),
         };
 
         let messages: Vec<Message> = vec![message];

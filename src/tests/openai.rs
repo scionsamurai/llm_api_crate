@@ -2,13 +2,13 @@
 #[cfg(test)]
 mod tests {
     use crate::openai::{call_gpt, get_embedding};
-    use crate::structs::general::Message;
+    use crate::structs::general::{ Message, MessageContent };
 
     #[tokio::test]
     async fn test_call_gpt() {
         let user_message = Message {
             role: "user".to_string(),
-            content: "Hello, can you tell me a joke?".to_string(),
+            content: MessageContent::Text("Hello, can you tell me a joke?".to_string()),
         };
         let messages = vec![user_message];
         let res = call_gpt(messages).await;
@@ -22,11 +22,11 @@ mod tests {
     async fn test_call_gpt_multi_prompt() {
         let system_message = Message {
             role: "system".to_string(),
-            content: "You are a helpful coding assistant.".to_string(),
+            content: MessageContent::Text("You are a helpful coding assistant.".to_string()),
         };
         let user_message_1 = Message {
             role: "user".to_string(),
-            content: "Hello, can you write a python function that reverses a string?".to_string(),
+            content: MessageContent::Text("Hello, can you write a python function that reverses a string?".to_string()),
         };
         let mut messages = vec![system_message, user_message_1];
         let res = call_gpt(messages.clone()).await;
@@ -35,7 +35,7 @@ mod tests {
                 assert!(!response.is_empty(), "Response should not be empty");
                 let user_message_2 = Message {
                     role: "user".to_string(),
-                    content: "Can you also provide an example of how to use that function?".to_string(),
+                    content: MessageContent::Text("Can you also provide an example of how to use that function?".to_string()),
                 };
                 messages.push(user_message_2);
                 let res = call_gpt(messages).await;

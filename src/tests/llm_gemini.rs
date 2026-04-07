@@ -2,7 +2,7 @@
 #[cfg(test)]
 mod tests {
     use crate::llm::{Access, LLM};
-    use crate::structs::general::Message;
+    use crate::structs::general::{ Message, MessageContent };
     use crate::config::LlmConfig;
 
     #[tokio::test]
@@ -43,15 +43,15 @@ mod tests {
         let messages = vec![
             Message {
                 role: "user".to_string(),
-                content:"Write the first line of a story about a magic backpack.".to_string(),
+                content: MessageContent::Text("Write the first line of a story about a magic backpack.".to_string()),
             },
             Message {
                 role: "model".to_string(),
-                content:"In the bustling city of Meadow brook, lived a young girl named Sophie. She was a bright and curious soul with an imaginative mind.".to_string(),
+                content: MessageContent::Text("In the bustling city of Meadow brook, lived a young girl named Sophie. She was a bright and curious soul with an imaginative mind.".to_string()),
             },
             Message {
                 role: "user".to_string(),
-                content:"Can you set it in a quiet village in 1600s France?".to_string(),
+                content: MessageContent::Text("Can you set it in a quiet village in 1600s France?".to_string()),
             },
         ];
 
@@ -69,7 +69,7 @@ mod tests {
         }
 
         // Test with config
-        let config = LlmConfig::new().with_thinking_budget(1024);
+        let config = LlmConfig::new(); // .with_thinking_budget(1024); // took thinking budget off test due to default model not supporting it
         let res = llm.send_convo_message(messages, None, Some(&config)).await;
         match res {
             Ok(response) => {

@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::llm::{Access, LLM};
-    use crate::structs::general::Message;
+    use crate::structs::general::{ Message, MessageContent };
 
     #[tokio::test]
     async fn test_send_single_message_openai() {
@@ -31,15 +31,15 @@ mod tests {
         let messages = vec![
             Message {
                 role: "system".to_string(),
-                content: "You are a helpful coding assistant.".to_string(),
+                content: MessageContent::Text("You are a helpful coding assistant.".to_string()),
             },
             Message {
                 role: "user".to_string(),
-                content: "Hello, can you write a python function that reverses a string?".to_string(),
+                content: MessageContent::Text("Hello, can you write a python function that reverses a string?".to_string()),
             },
             Message {
                 role: "user".to_string(),
-                content: "Can you also provide an example of how to use that function?".to_string(),
+                content: MessageContent::Text("Can you also provide an example of how to use that function?".to_string()),
             },
         ];
 

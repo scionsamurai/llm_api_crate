@@ -3,14 +3,14 @@
 #[cfg(test)]
 mod tests {
     use crate::anthropic::call_anthropic;
-    use crate::structs::general::Message;
+    use crate::structs::general::{ Message, MessageContent };
 
 
     #[tokio::test]
     async fn test_call_anthropic() {
         let user_message = Message {
             role: "user".to_string(),
-            content: "Hello, Claude. Can you tell me a joke?".to_string(),
+            content: MessageContent::Text("Hello, Claude. Can you tell me a joke?".to_string()),
         };
 
         let messages = vec![user_message];
@@ -33,15 +33,15 @@ mod tests {
         let mut messages = vec![
             Message {
                 role: "user".to_string(),
-                content: "Write the first line of a story about a magic backpack.".to_string(),
+                content: MessageContent::Text("Write the first line of a story about a magic backpack.".to_string()),
             },
             Message {
                 role: "assistant".to_string(),
-                content: "In the bustling city of Meadow brook, lived a young girl named Sophie. She was a bright and curious soul with an imaginative mind.".to_string(),
+                content: MessageContent::Text("In the bustling city of Meadow brook, lived a young girl named Sophie. She was a bright and curious soul with an imaginative mind.".to_string()),
             },
             Message {
                 role: "user".to_string(),
-                content: "Can you set it in a quiet village in 1600s France?".to_string(),
+                content: MessageContent::Text("Can you set it in a quiet village in 1600s France?".to_string()),
             },
         ];
 
@@ -52,12 +52,12 @@ mod tests {
                 println!("Response1: {}", &response);
                 messages.push(Message {
                     role: "assistant".to_string(),
-                    content: response
+                    content: MessageContent::Text(response),
                 });
 
                 let user_message_2 = Message {
                     role: "user".to_string(),
-                    content: "Can you also make the story about pokemon?".to_string(),
+                    content: MessageContent::Text("Can you also make the story about pokemon?".to_string()),
                 };
 
                 messages.push(user_message_2);

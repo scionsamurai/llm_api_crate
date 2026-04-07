@@ -12,6 +12,7 @@ pub enum LLM {
     OpenAI,
     Gemini,
     Anthropic,
+    LlamaServer,
 }
 
 #[async_trait]
@@ -53,14 +54,14 @@ impl Access for LLM {
             LLM::OpenAI => {
                 let openai_message: Message = Message {
                     role: "user".to_string(),
-                    content: message.to_string(),
+                    content: message.into(),
                 };
                 call_gpt(vec![openai_message]).await
             }
             LLM::Gemini => {
                 let gemini_message: Message = Message {
                     role: "user".to_string(),
-                    content: message.to_string(),
+                    content: message.into(),
                 };
                 // Call call_gemini, then extract the text from the GeminiResponse
                 let gemini_response = call_gemini(vec![gemini_message], model, config).await?;
@@ -74,9 +75,16 @@ impl Access for LLM {
             LLM::Anthropic => {
                 let anthropic_message: Message = Message {
                     role: "user".to_string(),
-                    content: message.to_string(),
+                    content: message.into(),
                 };
                 call_anthropic(vec![anthropic_message]).await
+            }
+            LLM::LlamaServer => {
+                let llama_message: Message = Message {
+                    role: "user".to_string(),
+                    content: message.into(),
+                };
+                crate::llama_server::call_llama_openai_compat(vec![llama_message], config).await
             }
         }
     }
@@ -95,11 +103,11 @@ impl Access for LLM {
                     .map(|msg| Content {
                         role: msg.role,
                         parts: vec![Part {
-                            text: msg.content,
+                            text: msg.content.extract_text(),
                         }],
                     })
                     .collect();
-    
+
                 // Call conversation_gemini_call, then extract the text from the GeminiResponse
                 let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
                 let full_text = gemini_response.candidates.into_iter().next()
@@ -116,6 +124,7 @@ impl Access for LLM {
                 Ok(full_text)
             }
             LLM::Anthropic => call_anthropic(messages).await,
+            LLM::LlamaServer => crate::llama_server::call_llama_openai_compat(messages, config).await,
         }
     }
 

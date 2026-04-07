@@ -11,7 +11,6 @@ use crate::gemini::request::gemini_request;
 use crate::gemini::response::parse_gemini_response; // Use parse_gemini_response
 use crate::config::LlmConfig;
 
-const DEFAULT_GEMINI_MODEL: &str = "gemini-2.0-flash";
 
 pub async fn conversation_gemini_call(
     messages: Vec<Content>,
@@ -19,12 +18,13 @@ pub async fn conversation_gemini_call(
     config: Option<&LlmConfig>,
 ) -> Result<GeminiResponse, Box<dyn std::error::Error + Send + Sync>> { // CHANGE RETURN TYPE
     dotenv().ok();
+    let DEFAULT_GEMINI_MODEL: String = env::var("DEFAULT_GEMINI_MODEL").unwrap_or_else(|_| "gemini-2.5-flash".to_string());
 
     let api_key: String = env::var("GEMINI_API_KEY").map_err(|_| GeneralError {
         message: "GOOGLE API KEY not found in environment variables".to_string(),
     })?;
 
-    let model_name = model.unwrap_or(DEFAULT_GEMINI_MODEL);
+    let model_name = model.unwrap_or(&DEFAULT_GEMINI_MODEL);
     let url: String = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
         model_name

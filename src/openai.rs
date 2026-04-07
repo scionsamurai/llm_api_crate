@@ -45,7 +45,14 @@ pub async fn call_gpt(
     let chat_completion: ChatCompletion = ChatCompletion {
         model: CHAT_COMPLETION_MODEL.to_string(),
         messages,
-        temperature: 0.1,
+        temperature: Some(0.1), // Note the Some() here
+        stream: None,
+        max_tokens: None,
+        stop: None,
+        top_k: None,
+        top_p: None,
+        cache_prompt: None,
+        response_format: None,
     };
 
     let res = client
@@ -75,7 +82,7 @@ pub async fn call_gpt(
                 }) as Box<dyn std::error::Error + Send + Sync>),
                 Err(e) => Err(Box::new(GeneralError {
                     message: format!("Failed to parse error response from OpenAI Chat Completion API: {} - Raw Response: {}", e, rspns_strng),
-                })),
+                }) as Box<dyn std::error::Error + Send + Sync>),
             }
         }
     }
@@ -147,7 +154,7 @@ pub async fn get_embedding(
             } else {
                 Err(Box::new(GeneralError {
                     message: "No embedding data found in the OpenAI Embeddings API response".to_string(),
-                }))
+                }) as Box<dyn std::error::Error + Send + Sync>)
             }
         }
         Err(_) => {
