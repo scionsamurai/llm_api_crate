@@ -5,9 +5,10 @@ use dotenv::dotenv;
 
 use crate::errors::GeneralError;
 use crate::structs::general::{ Message, MessageContent, LlmResponse };
-use crate::structs::openai::ChatCompletion;
-use crate::models::openai::{APIResponse, ErrorResponse};
+use crate::structs::openai::{ChatCompletion, EmbeddingRequest};
+use crate::models::openai::{APIResponse, ErrorResponse, EmbeddingResponse};
 use crate::structs::llama_server::{LlamaCompletionRequest, LlamaCompletionResponse};
+    
 use crate::config::LlmConfig;
 
 fn get_server_url() -> String {
@@ -237,3 +238,57 @@ pub async fn call_llama_legacy(
         reasoning: final_reasoning,
     })
 }
+
+pub async fn call_llama_embeddings(
+    input: String,
+    model: Option<&str>,
+    dimensions: Option<u32>,
+) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
+    let base_url = get_server_url();
+    let url = format!("{}/v1/embeddings", base_url);
+
+    let client = Client::new();
+
+    let embedding_request = EmbeddingRequest {
+        model: model.unwrap_or("embedder").to_string(),
+        input,
+        dimensions,
+        encoding_format: "float".to_string(),
+    };
+
+    let res = client
+        .post(&url)
+        .json(&embedding_request)
+        .send()
+        .await
+        .map_err(|e| {
+            Box::new(GeneralError {
+                message: format!("Failed to send request to Llama Server Embeddings: {}", e),
+            }) as Box<dyn std::error::Error + Send + Sync>
+        })?;
+
+    let status = res.status();
+    let rspns_strng = res.text().await.unwrap_or_default();
+
+    if !status.is_success() {
+        return Err(Box::new(GeneralError {
+            message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
+        }) as Box<dyn std::error::Error + Send + Sync>);
+    }
+
+    match serde_json::from_str::<EmbeddingResponse>(&rspns_strng) {
+        Ok(api_response) => {
+            if let Some(data) = api_response.data.first() {
+                Ok(data.embedding.clone())
+            } else {
+                Err(Box::new(GeneralError {
+                    message: "No embedding data found in Llama Server response".to_string(),
+                }) as Box<dyn std::error::Error + Send + Sync>)
+            }
+        },
+        Err(e) => Err(Box::new(GeneralError {
+            message: format!("Failed to parse Llama embedding response: {} - Raw: {}", e, rspns_strng),
+        }) as Box<dyn std::error::Error + Send + Sync>),
+    }
+}
+    

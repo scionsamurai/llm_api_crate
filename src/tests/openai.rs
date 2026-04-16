@@ -89,7 +89,9 @@ mod tests {
     #[tokio::test]
     async fn test_get_embedding() {
         let input_text = "This is a test sentence.";
-        let res = get_embedding(input_text.to_string(), None).await;
+        // Add the third argument (None) here:
+        let res = get_embedding(input_text.to_string(), None, None).await; 
+    
         match res {
             Ok(embedding) => {
                 assert!(!embedding.is_empty(), "Embedding should not be empty");
@@ -105,7 +107,7 @@ mod tests {
     async fn test_get_embedding_with_dimensions() {
         let input_text = "This is another test.";
         let dimensions: u32 = 64;
-        let res = get_embedding(input_text.to_string(), Some(dimensions)).await;
+        let res = get_embedding(input_text.to_string(), None, Some(dimensions)).await;
         match res {
             Ok(embedding) => {
                 assert!(!embedding.is_empty(), "Embedding should not be empty");

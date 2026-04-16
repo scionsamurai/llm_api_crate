@@ -132,6 +132,7 @@ pub async fn call_gpt(
 
 pub async fn get_embedding(
     input: String,
+    model: Option<&str>, // Added model parameter
     dimensions: Option<u32>,
 ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
     dotenv().ok();
@@ -139,7 +140,7 @@ pub async fn get_embedding(
     let api_key: String =
         env::var("OPEN_AI_KEY").expect("OPEN AI KEY not found in environment variables");
     let api_org: String =
-        env::var("OPEN_AI_ORG").expect("OPEN AI KEY not found in environment variables");
+        env::var("OPEN_AI_ORG").unwrap_or_default(); // Changed to unwrap_or_default for robustness
 
     let url: &str = "https://api.openai.com/v1/embeddings";
 
@@ -149,11 +150,14 @@ pub async fn get_embedding(
         HeaderValue::from_str(&format!("Bearer {}", api_key))
             .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
     );
-    headers.insert(
-        "OpenAI-Organization",
-        HeaderValue::from_str(api_org.as_str())
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
-    );
+    
+    if !api_org.is_empty() {
+        headers.insert(
+            "OpenAI-Organization",
+            HeaderValue::from_str(api_org.as_str())
+                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
+        );
+    }
     headers.insert(
         "Content-Type",
         HeaderValue::from_static("application/json"),
@@ -165,7 +169,7 @@ pub async fn get_embedding(
         .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
 
     let embedding_request = EmbeddingRequest {
-        model: EMBEDDING_MODEL.to_string(),
+        model: model.unwrap_or(EMBEDDING_MODEL).to_string(), // Use provided model or default
         input,
         dimensions,
         encoding_format: EMBEDDING_ENCODING_FORMAT.to_string(),
@@ -211,3 +215,4 @@ pub async fn get_embedding(
         }
     }
 }
+    

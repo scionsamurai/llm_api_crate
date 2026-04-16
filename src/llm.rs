@@ -40,10 +40,17 @@ pub trait Access {
         text: &str,
         model: &str,
     ) -> Result<u32, Box<dyn std::error::Error + Send + Sync>>;
+    async fn embed(
+        &self,
+        text: &str,
+        model: Option<&str>,
+        dimensions: Option<u32>,
+    ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>>;
 }
 
 #[async_trait]
 impl Access for LLM {
+    
     async fn send_single_message(
         &self,
         message: &str,
@@ -177,6 +184,32 @@ impl Access for LLM {
             _ => Err(Box::new(GeneralError {
                 message: format!("Currently only Gemini is implemented for count_tokens func"),
             }) as Box<dyn std::error::Error + Send + Sync>),
+        }
+    }
+
+    async fn embed(
+        &self,
+        text: &str,
+        model: Option<&str>,
+        dimensions: Option<u32>,
+    ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
+        match self {
+            LLM::OpenAI => {
+                crate::openai::get_embedding(text.to_string(), model, dimensions).await
+            }
+            LLM::LlamaServer => {
+                crate::llama_server::call_llama_embeddings(text.to_string(), model, dimensions).await
+            }
+            LLM::Gemini => {
+                Err(Box::new(GeneralError {
+                    message: "Gemini embeddings not yet implemented in Access trait".into(),
+                }) as Box<dyn std::error::Error + Send + Sync>)
+            }
+            LLM::Anthropic => {
+                Err(Box::new(GeneralError {
+                    message: "Anthropic embeddings not yet implemented in Access trait".into(),
+                }) as Box<dyn std::error::Error + Send + Sync>)
+            }
         }
     }
 }
