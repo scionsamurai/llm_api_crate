@@ -56,7 +56,11 @@ pub async fn call_llama_openai_compat(
     model: Option<&str>, 
     config: Option<&LlmConfig>,
 ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>> {
-    let base_url = get_server_url();
+    let base_url = if let Some(cfg) = config {
+        cfg.server_url.clone().unwrap_or_else(get_server_url)
+    } else {
+        get_server_url()
+    };
     let url = format!("{}/v1/chat/completions", base_url);
     let model_name = model.unwrap_or("gemma-4-26b").to_string();
 
