@@ -6,7 +6,10 @@ pub struct LlmConfig {
     pub temperature: Option<f64>,
     pub thinking_budget: Option<i32>,
     pub grounding_with_search: Option<bool>,
+    pub server_url: Option<String>,
+
     // --- New llama-server / Universal Parameters ---
+    
     pub stream: Option<bool>,
     pub max_tokens: Option<u32>,       // Maps to `n_predict` in legacy
     pub stop: Option<Vec<String>>,
@@ -36,7 +39,13 @@ impl LlmConfig {
         self
     }
 
+    pub fn with_server_url(mut self, url: String) -> Self {
+        self.server_url = Some(url);
+        self
+    }
+
     // --- New Builders ---
+    
     pub fn with_stream(mut self, stream: bool) -> Self {
         self.stream = Some(stream);
         self

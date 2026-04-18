@@ -4,7 +4,7 @@ The `llm_api_access` crate provides a unified way to interact with different lar
 
 ## Current Status
 
-This crate is used to power an open-source coding assistant currently in active development. Gemini has been the main test target; OpenAI (including embeddings), Anthropic, and Llama Server are supported. Recent updates include unified support for "thinking" or "reasoning" blocks from models like OpenAI's `o1`/`o3`, Anthropic's Claude 3.7, and Google's Gemini 2.0 Flash Thinking. Development is self-encouraged so updates can be far and few between, open an issue on github if you want something specific.
+This crate is used to power an open-source coding assistant currently in active development. Gemini has been the main test target. OpenAI, Gemini, and Llama Server are supported for both text generation and embeddings. Anthropic is supported for text generation. Recent updates include unified support for "thinking" or "reasoning" blocks from models like OpenAI's `o1`/`o3`, Anthropic's Claude 3.7, and Google's Gemini 2.0 Flash Thinking. Development is self-encouraged so updates can be far and few between, open an issue on github if you want something specific.
 
 ### Unified Response Structure
 
@@ -68,6 +68,15 @@ The `Access` trait defines asynchronous methods for interacting with LLMs:
         model: &str,
     ) -> Result<u32, Box<dyn std::error::Error + Send + Sync>>;
   ```
+  - `embed`: Generates a vector embedding for the provided text.
+  ```rust
+  async fn embed(
+        &self,
+        text: &str,
+        model: Option<&str>,
+        dimensions: Option<u32>,
+        config: Option<&LlmConfig>,
+    ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>>;
 
 The `LLM` enum implements `Access`, providing specific implementations for each method based on the chosen LLM provider.
 
@@ -206,53 +215,44 @@ async fn main() {
 
 ## Embeddings
 
-The crate provides support for generating text embeddings through the OpenAI API.
+The crate provides unified support for generating text embeddings across multiple providers via the `Access` trait. This allows you to switch between OpenAI, Gemini, or a local Llama server without changing your application logic.
 
-### OpenAI Embeddings
+### Supported Providers
 
-The `openai` module includes functionality to generate vector embeddings:
+| Provider | Default Model | Key Features |
+| :--- | :--- | :--- |
+| **OpenAI** | `text-embedding-3-small` | High-performance industry standard. |
+| **Gemini** | `text-embedding-004` | Supports **Matryoshka Representation Learning** (dimensionality reduction). |
+| **LlamaServer** | User-defined | Local, private embedding generation. |
 
-```rust
-pub async fn get_embedding(
-    input: String,
-    dimensions: Option<u32>,
-) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>>
-```
+### Unified Usage Example
 
-This function takes:
-- `input`: The text to generate embeddings for
-- `dimensions`: Optional parameter to specify the number of dimensions (if omitted, uses the model default)
-
-It returns a vector of floating point values representing the text embedding.
-
-### Example Usage:
+Regardless of the provider, you use the same `.embed()` method:
 
 ```rust
-use llm_api_access::openai::get_embedding;
+use llm_api_access::llm::{Access, LLM};
+use llm_api_access::config::LlmConfig;
 
 #[tokio::main]
 async fn main() {
-    // Generate an embedding with default dimensions
-    match get_embedding("This is a sample text for embedding".to_string(), None).await {
-        Ok(embedding) => {
-            println!("Generated embedding with {} dimensions", embedding.len());
-            // Use embedding for semantic search, clustering, etc.
-        },
-        Err(err) => eprintln!("Error generating embedding: {}", err),
-    }
-    
-    // Generate an embedding with custom dimensions
-    match get_embedding("Custom dimension embedding".to_string(), Some(64)).await {
-        Ok(embedding) => {
-            println!("Generated custom embedding with {} dimensions", embedding.len());
-            assert_eq!(embedding.len(), 64);
-        },
-        Err(err) => eprintln!("Error generating embedding: {}", err),
-    }
+    // 1. Using OpenAI
+    let openai = LLM::OpenAI;
+    let vec_oa = openai.embed("Hello world", None, None, None).await.unwrap();
+    println!("OpenAI dims: {}", vec_oa.len());
+
+    // 2. Using Gemini with dimensionality reduction (Matryoshka)
+    let gemini = LLM::Gemini;
+    let requested_dims = 256;
+    let vec_gem = gemini.embed("Hello world", Some("text-embedding-004"), Some(requested_dims), None).await.unwrap();
+    println!("Gemini dims: {}", vec_gem.len());
+    assert_eq!(vec_gem.len(), 256);
+
+    // 3. Using a local Llama Server
+    let llama = LLM::LlamaServer;
+    let vec_llama = llama.embed("Hello world", None, None, None).await.unwrap();
+    println!("Llama dims: {}", vec_llama.len());
 }
 ```
-
-The function uses the "text-embedding-3-small" model by default and requires the same environment variables as other OpenAI API calls (`OPEN_AI_KEY` and `OPEN_AI_ORG`).
 
 ## Testing
 

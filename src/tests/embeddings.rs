@@ -19,7 +19,7 @@ mod tests {
         let text = "Testing embedding integration for OpenAI.";
         
         // We use None for model to use the default EMBEDDING_MODEL defined in openai.rs
-        let result = llm.embed(text, None, None).await;
+        let result = llm.embed(text, None, None, None).await;
 
         match result {
             Ok(embedding) => {
@@ -38,7 +38,7 @@ mod tests {
         let llm = LLM::LlamaServer;
         let text = "Testing embedding integration for Llama Server.";
         
-        let result = llm.embed(text, None, None).await;
+        let result = llm.embed(text, None, None, None).await;
 
         match result {
             Ok(embedding) => {
@@ -72,7 +72,7 @@ mod tests {
         let text = "Testing custom dimensions.";
         let requested_dims = 512;
         
-        let result = llm.embed(text, None, Some(requested_dims)).await;
+        let result = llm.embed(text, None, Some(requested_dims), None).await;
 
         match result {
             Ok(embedding) => {

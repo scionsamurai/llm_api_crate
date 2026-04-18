@@ -2,10 +2,12 @@
 pub mod api;
 pub mod types;
 pub mod request;
-pub mod response; // Ensure response module is used for parse_gemini_response
+pub mod response;
 
 pub use api::*;
 pub use types::*;
+pub use response::*;
+    
 
 // https://ai.google.dev/tutorials/rest_quickstart
 

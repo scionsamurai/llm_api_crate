@@ -1,12 +1,12 @@
 // src/llm.rs
 use async_trait::async_trait;
 use crate::openai::call_gpt;
-use crate::gemini::{call_gemini, conversation_gemini_call, get_gemini_model_info, list_gemini_models, count_gemini_tokens};
+use crate::gemini::{call_gemini, conversation_gemini_call, get_gemini_model_info, list_gemini_models, count_gemini_tokens, gemini_to_llm_response};
 use crate::anthropic::call_anthropic;
 use crate::models::gemini::ModelInfo;
 use crate::errors::GeneralError;
-use crate::structs::general::{Message, Content, Part, LlmResponse}; // Added LlmResponse
-use crate::config::LlmConfig; // Import LlmConfig
+use crate::structs::general::{Message, Content, Part, LlmResponse}; 
+use crate::config::LlmConfig;
 
 pub enum LLM {
     OpenAI,
@@ -22,13 +22,13 @@ pub trait Access {
         message: &str,
         model: Option<&str>,
         config: Option<&LlmConfig>,
-    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>; // Changed return type
+    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>;
     async fn send_convo_message(
         &self,
         messages: Vec<Message>,
         model: Option<&str>,
         config: Option<&LlmConfig>,
-    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>; // Changed return type
+    ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>;
     async fn get_model_info(
         &self,
         model: &str,
@@ -45,12 +45,14 @@ pub trait Access {
         text: &str,
         model: Option<&str>,
         dimensions: Option<u32>,
+        config: Option<&LlmConfig>,
     ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>>;
 }
 
 #[async_trait]
 impl Access for LLM {
     
+    // REFACTORED: Now just a wrapper for send_convo_message
     async fn send_single_message(
         &self,
         message: &str,
@@ -60,9 +62,9 @@ impl Access for LLM {
         match self {
             LLM::OpenAI => {
                 let openai_message: Message = Message {
-                    role: "user".to_string(),
-                    content: message.into(),
-                };
+            role: "user".to_string(),
+            content: message.into(),
+        };
                 call_gpt(vec![openai_message], model, config).await 
             }
             LLM::Gemini => {
@@ -128,23 +130,8 @@ impl Access for LLM {
                     .collect();
 
                 let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
-                
-                let candidate = gemini_response.candidates.into_iter().next()
-                    .ok_or_else(|| Box::new(GeneralError { message: "No Gemini candidates".into() }) as Box<dyn std::error::Error + Send + Sync>)?;
-
-                let mut text = String::new();
-                let mut reasoning = None;
-
-                for part in candidate.content.parts {
-                    if let Some(t) = part.text {
-                        text.push_str(&t);
-                    }
-                    if let Some(th) = part.thought {
-                        reasoning = Some(th);
-                    }
-                }
-
-                Ok(LlmResponse { text, reasoning })
+                // REFACTORED: Using the centralized helper
+                gemini_to_llm_response(gemini_response)
             }
             LLM::Anthropic => call_anthropic(messages, model, config).await, 
             LLM::LlamaServer => crate::llama_server::call_llama_openai_compat(messages, model, config).await,
@@ -192,18 +179,17 @@ impl Access for LLM {
         text: &str,
         model: Option<&str>,
         dimensions: Option<u32>,
+        config: Option<&LlmConfig>,
     ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::OpenAI => {
-                crate::openai::get_embedding(text.to_string(), model, dimensions).await
+                crate::openai::get_embedding(text.to_string(), model, dimensions, config).await
             }
             LLM::LlamaServer => {
-                crate::llama_server::call_llama_embeddings(text.to_string(), model, dimensions).await
+                crate::llama_server::call_llama_embeddings(text.to_string(), model, dimensions, config).await
             }
             LLM::Gemini => {
-                Err(Box::new(GeneralError {
-                    message: "Gemini embeddings not yet implemented in Access trait".into(),
-                }) as Box<dyn std::error::Error + Send + Sync>)
+                crate::gemini::call_gemini_embeddings(text.to_string(), model, dimensions, config).await
             }
             LLM::Anthropic => {
                 Err(Box::new(GeneralError {

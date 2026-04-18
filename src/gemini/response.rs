@@ -2,6 +2,8 @@
 use crate::errors::GeneralError;
 use serde::de::DeserializeOwned;
 use crate::gemini::types::{GeminiResponse, GeminiErrorResponse};
+use crate::structs::general::LlmResponse;
+    
 
 pub async fn parse_gemini_response<T: DeserializeOwned>(
     response: reqwest::Response,
@@ -13,13 +15,38 @@ pub async fn parse_gemini_response<T: DeserializeOwned>(
     })?;
 
     serde_json::from_str(&response_body).map_err(|e| {
+        println!("Failed to parse response body: {}", response_body);
         Box::new(GeneralError {
             message: format!("Failed to parse response from Gemini API 1: {}", e.to_string()),
         }) as Box<dyn std::error::Error + Send + Sync>
     })
 }
 
+/// NEW: Converts a GeminiResponse into a unified LlmResponse.
+/// This centralizes the extraction of text and reasoning.
+pub fn gemini_to_llm_response(
+    gemini_response: GeminiResponse,
+) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>> {
+    let candidate = gemini_response.candidates.into_iter().next()
+        .ok_or_else(|| Box::new(GeneralError { message: "No Gemini candidates".into() }) as Box<dyn std::error::Error + Send + Sync>)?;
+
+    let mut text = String::new();
+    let mut reasoning = None;
+
+    for part in candidate.content.parts {
+        if let Some(t) = part.text {
+            text.push_str(&t);
+        }
+        if let Some(th) = part.thought {
+            reasoning = Some(th);
+        }
+    }
+
+    Ok(LlmResponse { text, reasoning })
+}
+
 pub fn handle_gemini_error(response_body: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    
     let gemini_response: Result<GeminiResponse, _> = serde_json::from_str(&response_body);
 
     match gemini_response {

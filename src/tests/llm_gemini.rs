@@ -147,3 +147,52 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod embedding_tests {
+    use crate::llm::{LLM, Access};
+
+    #[tokio::test]
+    async fn test_gemini_embedding_success() {
+        let llm = LLM::Gemini;
+        let text = "The quick brown fox jumps over the lazy dog.";
+        // Using the latest model
+        let model = Some("gemini-embedding-001");
+
+        let result = llm.embed(text, model, None, None).await;
+
+        match result {
+            Ok(vec) => {
+                assert!(!vec.is_empty(), "Embedding vector should not be empty");
+                println!("Successfully retrieved embedding of length: {}", vec.len());
+            }
+            Err(e) => {
+                panic!("Gemini embedding failed: {}", e);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_gemini_embedding_dimensions() {
+        let llm = LLM::Gemini;
+        let text = "Testing dimensionality reduction with Matryoshka.";
+        let model = Some("gemini-embedding-001");
+        let requested_dims = 256;
+
+        let result = llm.embed(text, model, Some(requested_dims), None).await;
+
+        match result {
+            Ok(vec) => {
+                assert_eq!(
+                    vec.len(), 
+                    requested_dims as usize, 
+                    "The embedding vector length should match the requested dimensions"
+                );
+                println!("Successfully retrieved dimension-reduced embedding: {}", vec.len());
+            }
+            Err(e) => {
+                panic!("Gemini dimension-reduced embedding failed: {}", e);
+            }
+        }
+    }
+}

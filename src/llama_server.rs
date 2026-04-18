@@ -13,7 +13,7 @@ use crate::config::LlmConfig;
 
 fn get_server_url() -> String {
     dotenv().ok(); 
-    env::var("LLAMA_SERVER_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string())
+    env::var("LLAMA_SERVER_URL").unwrap_or_else(|_| "http://192.168.0.91:8080".to_string())
 }
 
 /// Helper function to manually extract Gemma 4 or DeepSeek reasoning tags 
@@ -83,7 +83,7 @@ pub async fn call_llama_openai_compat(
             }
         }
     }
-    println!("Processed Messages for Llama Server:\n{:#?}", processed_messages);
+    // println!("Processed Messages for Llama Server:\n{:#?}", processed_messages);
 
     let mut request_body = ChatCompletion {
         model: model_name, 
@@ -243,11 +243,23 @@ pub async fn call_llama_embeddings(
     input: String,
     model: Option<&str>,
     dimensions: Option<u32>,
+    config: Option<&LlmConfig>, // Added this
 ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
-    let base_url = get_server_url();
-    let url = format!("{}/v1/embeddings", base_url);
+    
+    // IP OVERRIDE LOGIC:
+    // 1. Check if config provides a specific URL
+    // 2. If not, fall back to the default get_server_url()
+    let base_url = if let Some(cfg) = config {
+        // Assuming LlmConfig has a field 'server_url'
+        // If it doesn't, we'd use: cfg.server_url.clone().unwrap_or_else(|| get_server_url())
+        cfg.server_url.clone().unwrap_or_else(get_server_url)
+    } else {
+        get_server_url()
+    };
 
+    let url = format!("{}/v1/embeddings", base_url);
     let client = Client::new();
+    
 
     let embedding_request = EmbeddingRequest {
         model: model.unwrap_or("embedder").to_string(),

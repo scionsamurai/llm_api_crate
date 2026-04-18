@@ -126,3 +126,26 @@ pub struct GeminiErrorDetail {
     pub domain: String,
     pub metadata: HashMap<String, String>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct GeminiEmbeddingRequest {
+    pub model: String,
+    pub content: GeminiEmbeddingContent,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_dimensionality: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GeminiEmbeddingContent {
+    pub parts: Vec<crate::structs::general::Part>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GeminiEmbeddingResponse {
+    pub embedding: GeminiEmbeddingValues,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GeminiEmbeddingValues {
+    pub values: Vec<f32>,
+}

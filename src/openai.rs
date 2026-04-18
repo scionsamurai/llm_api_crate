@@ -134,7 +134,9 @@ pub async fn get_embedding(
     input: String,
     model: Option<&str>, // Added model parameter
     dimensions: Option<u32>,
+    _config: Option<&LlmConfig>, // Added, prefixed with _ as it's currently unused
 ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
+    
     dotenv().ok();
 
     let api_key: String =
