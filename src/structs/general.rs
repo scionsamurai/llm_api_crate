@@ -59,6 +59,14 @@ pub struct ImageUrl {
     pub url: String,
 }
 
+// --- New: Enum to handle inconsistent 'thought' types from different models ---
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ThoughtContent {
+    Boolean(bool),
+    String(String),
+}
+
 // --- Updated Message Struct ---
 #[derive(Debug, Serialize, Clone)]
 pub struct Message {
@@ -78,5 +86,5 @@ pub struct Part {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub thought: Option<String>, // Added for reasoning support
+    pub thought: Option<ThoughtContent>, // Updated from Option<String>
 }

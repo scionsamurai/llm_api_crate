@@ -72,25 +72,12 @@ impl Access for LLM {
                     role: "user".to_string(),
                     content: message.into(),
                 };
+                // Call the API
                 let gemini_response = call_gemini(vec![gemini_message], model, config).await?;
                 
-                // Extract text and reasoning by iterating through all parts
-                let candidate = gemini_response.candidates.into_iter().next()
-                    .ok_or_else(|| Box::new(GeneralError { message: "No Gemini candidates".into() }) as Box<dyn std::error::Error + Send + Sync>)?;
-                
-                let mut text = String::new();
-                let mut reasoning = None;
-
-                for part in candidate.content.parts {
-                    if let Some(t) = part.text {
-                        text.push_str(&t);
-                    }
-                    if let Some(th) = part.thought {
-                        reasoning = Some(th);
-                    }
-                }
-
-                Ok(LlmResponse { text, reasoning })
+                // REFACTORED: Use the centralized helper instead of manual extraction.
+                // This fixes the type mismatch error and handles the ThoughtContent enum correctly.
+                gemini_to_llm_response(gemini_response)
             }
             LLM::Anthropic => {
                 let anthropic_message: Message = Message {
@@ -130,6 +117,7 @@ impl Access for LLM {
                     .collect();
 
                 let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
+                println!("Raw Gemini Response: {:#?}", gemini_response);
                 // REFACTORED: Using the centralized helper
                 gemini_to_llm_response(gemini_response)
             }
