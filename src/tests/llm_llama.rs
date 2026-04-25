@@ -4,8 +4,9 @@
 mod tests {
     use crate::llm::{Access, LLM};
     use crate::config::LlmConfig;
-    use crate::structs::general::Message;
+    use crate::structs::general::{Message, MessageContent, LlmChunk};
     use crate::llama_server::call_llama_legacy;
+    use futures::stream::StreamExt;
 
     // Use the model name that matches the file in your model folder
     const TEST_MODEL: &str = "gemma-4-26b";
@@ -99,5 +100,34 @@ mod tests {
             }
             Err(err) => panic!("Legacy network call failed: {}", err),
         }
+    }
+
+    #[tokio::test]
+    async fn test_llama_streaming() {
+        let llm = LLM::LlamaServer;
+        let messages = vec![Message {
+            role: "user".to_string(),
+            content: MessageContent::Text("What is the capital of France?".to_string()),
+        }];
+
+        let mut stream = llm.send_streaming_convo_message(messages, None, None)
+            .await
+            .expect("Failed to initiate Llama stream");
+
+        let mut full_text = String::new();
+        
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.expect("Error while streaming Llama chunk");
+            match chunk {
+                LlmChunk::Text(t) => {
+                    print!("{}", t);
+                    full_text.push_str(&t);
+                }
+                LlmChunk::Reasoning(r) => println!("\n[Thinking]: {}", r),
+                LlmChunk::Done => break,
+            }
+        }
+
+        assert!(!full_text.is_empty(), "Llama stream should return text");
     }
 }

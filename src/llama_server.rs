@@ -4,9 +4,12 @@ use std::env;
 use std::time::Duration;
 use dotenv::dotenv;
 
+use futures::stream::{BoxStream, StreamExt};
+use async_stream::stream;
 use crate::errors::{GeneralError, with_retry};
-use crate::structs::general::{ Message, MessageContent, LlmResponse };
+use crate::structs::general::{ Message, MessageContent, LlmResponse, LlmChunk };
 use crate::structs::openai::{ChatCompletion, EmbeddingRequest};
+use crate::openai::StreamResponse;
 use crate::models::openai::{APIResponse, ErrorResponse, EmbeddingResponse};
 use crate::structs::llama_server::{LlamaCompletionRequest, LlamaCompletionResponse};
     
@@ -167,6 +170,105 @@ pub async fn call_llama_openai_compat(
             }
         }
     }, 3, Duration::from_secs(1)).await
+}
+
+pub async fn call_llama_stream(
+    messages: Vec<Message>,
+    model: Option<&str>,
+    config: Option<&LlmConfig>,
+) -> Result<BoxStream<'static, Result<LlmChunk, Box<dyn std::error::Error + Send + Sync>>>, Box<dyn std::error::Error + Send + Sync>> {
+    let base_url = if let Some(cfg) = config {
+        cfg.server_url.clone().unwrap_or_else(get_server_url)
+    } else {
+        get_server_url()
+    };
+    let url = format!("{}/v1/chat/completions", base_url);
+    let model_name = model.unwrap_or("gemma-4-26b").to_string();
+
+    let mut processed_messages = messages;
+
+    // Inject <|think|> trigger for Gemma 4 if budget is set
+    if let Some(cfg) = config {
+        if cfg.thinking_budget.is_some() {
+            let has_system = processed_messages.first().map(|m| m.role == "system").unwrap_or(false);
+            if has_system {
+                let first = processed_messages.first_mut().unwrap();
+                if let MessageContent::Text(ref mut text) = first.content {
+                    if !text.starts_with("<|think|>") {
+                        *text = format!("<|think|>\n{}", text);
+                    }
+                }
+            } else {
+                processed_messages.insert(0, Message {
+                    role: "system".to_string(),
+                    content: MessageContent::Text("<|think|>".to_string()),
+                });
+            }
+        }
+    }
+
+    let mut request_body = ChatCompletion {
+        model: model_name, 
+        messages: processed_messages,
+        stream: Some(true), // MUST be true
+        ..Default::default() // Ensure ChatCompletion derives Default or fill fields
+    };
+
+    if let Some(cfg) = config {
+        request_body.temperature = cfg.temperature.map(|t| t as f32);
+        request_body.max_tokens = cfg.max_tokens;
+        request_body.stop = cfg.stop.clone();
+        request_body.top_k = cfg.top_k;
+        request_body.top_p = cfg.top_p;
+        request_body.response_format = cfg.json_schema.clone();
+    }
+
+    let client = Client::new();
+    let res = client.post(&url).json(&request_body).send().await?;
+
+    if !res.status().is_success() {
+        let err_text = res.text().await?;
+        return Err(Box::new(GeneralError { message: format!("Llama Server Stream Error: {}", err_text) }));
+    }
+
+    let byte_stream = res.bytes_stream();
+
+    let output_stream = stream! {
+        let mut buffer = String::new();
+        let mut bytes_stream = byte_stream;
+
+        while let Some(item) = bytes_stream.next().await {
+            match item {
+                Ok(bytes) => {
+                    buffer.push_str(&String::from_utf8_lossy(&bytes));
+                    while let Some(newline_idx) = buffer.find('\n') {
+                        let line = buffer.drain(..newline_idx + 1).collect::<String>().trim().to_string();
+                        if line.is_empty() { continue; }
+                        if line == "data: [DONE]" {
+                            yield Ok(LlmChunk::Done);
+                            return; 
+                        }
+                        if line.starts_with("data: ") {
+                            let json_str = &line[6..];
+                            if let Ok(parsed) = serde_json::from_str::<StreamResponse>(json_str) {
+                                if let Some(choice) = parsed.choices.first() {
+                                    if let Some(content) = &choice.delta.content {
+                                        yield Ok(LlmChunk::Text(content.clone()));
+                                    }
+                                    if let Some(reasoning) = &choice.delta.reasoning_content {
+                                        yield Ok(LlmChunk::Reasoning(reasoning.clone()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => yield Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
+            }
+        }
+    };
+
+    Ok(Box::pin(output_stream))
 }
 
 pub async fn call_llama_legacy(

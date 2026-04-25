@@ -4,8 +4,12 @@ use reqwest::Client;
 use std::env;
 use dotenv::dotenv;
 
+use futures::stream::{BoxStream, StreamExt};
+use async_stream::stream;
+use serde::Deserialize;
+
 use crate::errors::GeneralError;
-use crate::structs::general::{Message, LlmResponse}; 
+use crate::structs::general::{Message, LlmResponse, LlmChunk}; 
 use crate::structs::openai::{ChatCompletion, EmbeddingRequest};
 use crate::models::openai::{APIResponse, ErrorResponse, EmbeddingResponse};
 use crate::config::LlmConfig; // <-- Import config
@@ -13,6 +17,129 @@ use crate::config::LlmConfig; // <-- Import config
 const CHAT_COMPLETION_MODEL: &str = "gpt-4o"; // Updated default
 const EMBEDDING_MODEL: &str = "text-embedding-3-small";
 const EMBEDDING_ENCODING_FORMAT: &str = "float";
+
+#[derive(Debug, Deserialize)]
+pub struct StreamResponse {
+    pub choices: Vec<StreamChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StreamChoice {
+    pub delta: StreamDelta,
+    pub finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StreamDelta {
+    pub content: Option<String>,
+    pub reasoning_content: Option<String>,
+}
+
+pub async fn call_gpt_stream(
+    messages: Vec<Message>,
+    model: Option<&str>,
+    config: Option<&LlmConfig>,
+) -> Result<BoxStream<'static, Result<LlmChunk, Box<dyn std::error::Error + Send + Sync>>>, Box<dyn std::error::Error + Send + Sync>> {
+    dotenv().ok();
+
+    let api_key = env::var("OPEN_AI_KEY").expect("OPEN AI KEY not found");
+    let api_org = env::var("OPEN_AI_ORG").unwrap_or_default();
+    let url = "https://api.openai.com/v1/chat/completions";
+
+    let mut headers = HeaderMap::new();
+    headers.insert("authorization", HeaderValue::from_str(&format!("Bearer {}", api_key)).unwrap());
+    if !api_org.is_empty() {
+        headers.insert("OpenAI-Organization", HeaderValue::from_str(&api_org).unwrap());
+    }
+
+    let client = Client::builder().default_headers(headers).build()?;
+    let model_name = model.unwrap_or(CHAT_COMPLETION_MODEL).to_string();
+    let is_reasoning_model = model_name.starts_with("o1") || model_name.starts_with("o3");
+
+    let mut chat_completion = ChatCompletion {
+        model: model_name,
+        messages,
+        temperature: None,
+        stream: Some(true), // MUST be true for streaming
+        max_tokens: None,
+        max_completion_tokens: None,
+        stop: None,
+        top_k: None,
+        top_p: None,
+        cache_prompt: None,
+        response_format: None,
+    };
+
+    // Apply config (Same logic as your existing call_gpt)
+    if let Some(cfg) = config {
+        if is_reasoning_model {
+            chat_completion.max_completion_tokens = cfg.max_tokens;
+        } else {
+            chat_completion.temperature = cfg.temperature.map(|t| t as f32);
+            chat_completion.max_tokens = cfg.max_tokens;
+        }
+        chat_completion.stop = cfg.stop.clone();
+        chat_completion.top_k = cfg.top_k;
+        chat_completion.top_p = cfg.top_p;
+        chat_completion.response_format = cfg.json_schema.clone();
+    }
+
+    let res = client.post(url).json(&chat_completion).send().await?;
+
+    if !res.status().is_success() {
+        let err_text = res.text().await?;
+        return Err(Box::new(GeneralError { message: format!("OpenAI Stream Error: {}", err_text) }));
+    }
+
+    // The magic happens here: we convert the byte stream into an LlmChunk stream
+    let byte_stream = res.bytes_stream();
+
+    let output_stream = stream! {
+        let mut buffer = String::new();
+        let mut bytes_stream = byte_stream;
+
+        while let Some(item) = bytes_stream.next().await {
+            match item {
+                Ok(bytes) => {
+                    buffer.push_str(&String::from_utf8_lossy(&bytes));
+                    
+                    // SSE events are delimited by double newlines
+                    while let Some(newline_idx) = buffer.find('\n') {
+                        let line = buffer.drain(..newline_idx + 1).collect::<String>().trim().to_string();
+                        
+                        if line.is_empty() { continue; }
+                        if line == "data: [DONE]" {
+                            yield Ok(LlmChunk::Done);
+                            return; 
+                        }
+                        if line.starts_with("data: ") {
+                            let json_str = &line[6..];
+                            match serde_json::from_str::<StreamResponse>(json_str) {
+                                Ok(parsed) => {
+                                    if let Some(choice) = parsed.choices.first() {
+                                        if let Some(content) = &choice.delta.content {
+                                            yield Ok(LlmChunk::Text(content.clone()));
+                                        }
+                                        if let Some(reasoning) = &choice.delta.reasoning_content {
+                                            yield Ok(LlmChunk::Reasoning(reasoning.clone()));
+                                        }
+                                    }
+                                },
+                                Err(_e) => {
+                                    // Some lines might be partial or metadata, we can choose to ignore or yield error
+                                    // For OpenAI, we generally ignore non-JSON "data:" lines unless they are [DONE]
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => yield Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
+            }
+        }
+    };
+
+    Ok(Box::pin(output_stream))
+}
 
 pub async fn call_gpt(
     messages: Vec<Message>,

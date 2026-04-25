@@ -88,3 +88,11 @@ pub struct Part {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thought: Option<ThoughtContent>, // Updated from Option<String>
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LlmChunk {
+    Text(String),
+    Reasoning(String),
+    /// Use this to signal the end of the stream or provide final metadata (like token counts)
+    Done,
+}

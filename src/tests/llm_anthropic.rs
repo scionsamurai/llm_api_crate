@@ -2,7 +2,8 @@
 #[cfg(test)]
 mod tests {
     use crate::llm::{Access, LLM};
-    use crate::structs::general::{ Message, MessageContent };
+    use crate::structs::general::{Message, MessageContent, LlmChunk};
+    use futures::stream::StreamExt;
 
     #[tokio::test]
     async fn test_send_single_message_anthropic() {
@@ -54,5 +55,34 @@ mod tests {
                 assert!(false, "Call to Anthropic API failed");
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_anthropic_streaming() {
+        let llm = LLM::Anthropic;
+        let messages = vec![Message {
+            role: "user".to_string(),
+            content: MessageContent::Text("Tell me a joke about AI.".to_string()),
+        }];
+
+        let mut stream = llm.send_streaming_convo_message(messages, None, None)
+            .await
+            .expect("Failed to initiate Anthropic stream");
+
+        let mut full_text = String::new();
+
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.expect("Error while streaming Anthropic chunk");
+            match chunk {
+                LlmChunk::Text(t) => {
+                    print!("{}", t);
+                    full_text.push_str(&t);
+                }
+                LlmChunk::Reasoning(r) => println!("\n[Reasoning]: {}", r),
+                LlmChunk::Done => break,
+            }
+        }
+
+        assert!(!full_text.is_empty(), "Anthropic stream should return text");
     }
 }

@@ -2,8 +2,9 @@
 #[cfg(test)]
 mod tests {
     use crate::llm::{Access, LLM};
-    use crate::structs::general::{ Message, MessageContent };
+    use crate::structs::general::{Message, MessageContent, LlmChunk};
     use crate::config::LlmConfig;
+    use futures::stream::StreamExt;
 
     #[tokio::test]
     async fn test_send_single_message_gemini() {
@@ -145,6 +146,35 @@ mod tests {
                 panic!("Failed to count tokens: {}", err);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_gemini_streaming() {
+        let llm = LLM::Gemini;
+        let messages = vec![Message {
+            role: "user".to_string(),
+            content: MessageContent::Text("Explain quantum entanglement in one sentence.".to_string()),
+        }];
+
+        let mut stream = llm.send_streaming_convo_message(messages, None, None)
+            .await
+            .expect("Failed to initiate Gemini stream");
+
+        let mut full_text = String::new();
+
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.expect("Error while streaming Gemini chunk");
+            match chunk {
+                LlmChunk::Text(t) => {
+                    print!("{}", t);
+                    full_text.push_str(&t);
+                }
+                LlmChunk::Reasoning(r) => println!("\n[Thought]: {}", r),
+                LlmChunk::Done => break,
+            }
+        }
+
+        assert!(!full_text.is_empty(), "Gemini stream should return text");
     }
 }
 

@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::structs::general::Message;
 use serde_json::Value;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Default)]
 pub struct ChatCompletion {
     pub model: String,
     pub messages: Vec<Message>,

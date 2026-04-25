@@ -5,7 +5,8 @@ use crate::gemini::{call_gemini, conversation_gemini_call, get_gemini_model_info
 use crate::anthropic::call_anthropic;
 use crate::models::gemini::ModelInfo;
 use crate::errors::GeneralError;
-use crate::structs::general::{Message, Content, Part, LlmResponse}; 
+use futures::stream::BoxStream;
+use crate::structs::general::{Message, Content, Part, LlmResponse, LlmChunk}; 
 use crate::config::LlmConfig;
 
 pub enum LLM {
@@ -29,6 +30,14 @@ pub trait Access {
         model: Option<&str>,
         config: Option<&LlmConfig>,
     ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>;
+
+    async fn send_streaming_convo_message(
+        &self,
+        messages: Vec<Message>,
+        model: Option<&str>,
+        config: Option<&LlmConfig>,
+    ) -> Result<BoxStream<'static, Result<LlmChunk, Box<dyn std::error::Error + Send + Sync>>>, Box<dyn std::error::Error + Send + Sync>>;
+
     async fn get_model_info(
         &self,
         model: &str,
@@ -126,10 +135,24 @@ impl Access for LLM {
         }
     }
 
+    async fn send_streaming_convo_message(
+        &self,
+        messages: Vec<Message>,
+        model: Option<&str>,
+        config: Option<&LlmConfig>,
+    ) -> Result<BoxStream<'static, Result<LlmChunk, Box<dyn std::error::Error + Send + Sync>>>, Box<dyn std::error::Error + Send + Sync>> {
+        match self {
+            LLM::OpenAI => crate::openai::call_gpt_stream(messages, model, config).await,
+            LLM::LlamaServer => crate::llama_server::call_llama_stream(messages, model, config).await,
+            LLM::Anthropic => crate::anthropic::call_anthropic_stream(messages, model, config).await,
+            LLM::Gemini => crate::gemini::api::call_gemini_stream(messages, model, config).await,
+        }
+    }
+
     async fn get_model_info(
         &self,
         model: &str,
-    ) -> Result<ModelInfo, Box<dyn std::error::Error + Send + Sync>> {
+        ) -> Result<ModelInfo, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::Gemini => get_gemini_model_info(model).await,
             _ => Err(Box::new(GeneralError {

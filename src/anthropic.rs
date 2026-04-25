@@ -6,7 +6,9 @@ use std::env;
 use crate::errors::GeneralError;
 use dotenv::dotenv;
 
-use crate::structs::general::{Message, LlmResponse};
+use futures::stream::{BoxStream, StreamExt};
+use async_stream::stream;
+use crate::structs::general::{Message, LlmResponse, LlmChunk};
 use crate::config::LlmConfig; // <-- Import config
 
 // --- NEW: Added Thinking Config struct ---
@@ -22,6 +24,7 @@ pub struct AnthropicRequest {
     pub model: String,
     pub max_tokens: usize,
     pub messages: Vec<Message>,
+    pub stream: bool, // <--- ADD THIS LINE
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking: Option<ThinkingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,8 +66,32 @@ pub enum Content {
     Unknown,
 }
 
-// --- UPDATED: Signature now accepts model and config ---
-pub async fn call_anthropic(
+    #[derive(Debug, Deserialize)]
+    #[serde(tag = "type")]
+    #[allow(dead_code)]
+    enum AnthropicEvent {
+        #[serde(rename = "message_start")]
+        MessageStart { message: serde_json::Value },
+        #[serde(rename = "content_block_start")]
+        ContentBlockStart { index: u32 },
+        #[serde(rename = "content_block_delta")]
+        ContentBlockDelta { delta: AnthropicDelta },
+        #[serde(rename = "content_block_stop")]
+        ContentBlockStop { index: u32 },
+        #[serde(rename = "message_stop")]
+        MessageStop { stop_reason: String },
+        #[serde(other)]
+        Unknown,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct AnthropicDelta {
+        pub text: Option<String>,
+        pub thinking: Option<String>,
+    }
+
+    // --- UPDATED: Signature now accepts model and config ---
+    pub async fn call_anthropic(
     messages: Vec<Message>,
     model: Option<&str>,
     config: Option<&LlmConfig>,
@@ -131,6 +158,7 @@ pub async fn call_anthropic(
         model: model.unwrap_or(MODEL).to_string(),
         max_tokens: DEFAULT_MAX_TOKENS,
         messages: processed_messages,
+        stream: false,
         thinking: None,
         temperature: None,
     };
@@ -210,4 +238,93 @@ pub async fn call_anthropic(
         text: text_output,
         reasoning: reasoning_output,
     })
+}
+
+pub async fn call_anthropic_stream(
+    messages: Vec<Message>,
+    model: Option<&str>,
+    config: Option<&LlmConfig>,
+) -> Result<BoxStream<'static, Result<LlmChunk, Box<dyn std::error::Error + Send + Sync>>>, Box<dyn std::error::Error + Send + Sync>> {
+    dotenv().ok();
+    let api_key = env::var("ANTHROPIC_API_KEY").map_err(|_| GeneralError { message: "ANTHROPIC API KEY not found".into() })?;
+    let url = "https://api.anthropic.com/v1/messages";
+
+    let mut headers = HeaderMap::new();
+    headers.insert("x-api-key", HeaderValue::from_str(&api_key)?);
+    headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
+    headers.insert("content-type", HeaderValue::from_static("application/json"));
+
+    let client = Client::builder().default_headers(headers).build()?;
+
+    let processed_messages = messages.into_iter().map(|mut m| {
+        if m.role == "model" { m.role = "assistant".to_string(); }
+        m
+    }).collect();
+
+    let mut request = AnthropicRequest {
+        model: model.unwrap_or(MODEL).to_string(),
+        max_tokens: DEFAULT_MAX_TOKENS,
+        messages: processed_messages,
+        stream: true,
+        thinking: None,
+        temperature: None,
+    };
+
+    if let Some(cfg) = config {
+        if let Some(max_t) = cfg.max_tokens { request.max_tokens = max_t as usize; }
+        if let Some(budget) = cfg.thinking_budget {
+            let valid_budget = if budget < 1024 { 1024 } else { budget as usize };
+            request.thinking = Some(ThinkingConfig { r#type: "enabled".to_string(), budget_tokens: valid_budget });
+            if request.max_tokens <= valid_budget { request.max_tokens = valid_budget + 1024; }
+        } else if let Some(temp) = cfg.temperature {
+            request.temperature = Some(temp as f32);
+        }
+    }
+
+    let res = client.post(url).json(&request).send().await?;
+    if !res.status().is_success() {
+        let err_text = res.text().await?;
+        return Err(Box::new(GeneralError { message: format!("Anthropic Stream Error: {}", err_text) }));
+    }
+    
+    let byte_stream = res.bytes_stream();
+
+    let output_stream = stream! {
+        let mut buffer = String::new();
+        let mut bytes_stream = byte_stream;
+
+        while let Some(item) = bytes_stream.next().await {
+            match item {
+                Ok(bytes) => {
+                    buffer.push_str(&String::from_utf8_lossy(&bytes));
+                    while let Some(newline_idx) = buffer.find('\n') {
+                        let line = buffer.drain(..newline_idx + 1).collect::<String>().trim().to_string();
+                        if line.is_empty() { continue; }
+                        if line.starts_with("data: ") {
+                            let json_str = &line[6..];
+
+                            if let Ok(event) = serde_json::from_str::<AnthropicEvent>(json_str) {
+                                match event {
+                                    AnthropicEvent::ContentBlockDelta { delta } => {
+                                        if let Some(t) = delta.text { yield Ok(LlmChunk::Text(t)); }
+                                        if let Some(th) = delta.thinking { yield Ok(LlmChunk::Reasoning(th)); }
+                                    }
+                                    AnthropicEvent::MessageStop { .. } => {
+                                        yield Ok(LlmChunk::Done);
+                                        return;
+                                    }
+                                    _ => {}
+                                }
+                            } else {
+                                eprintln!("DEBUG: Failed to parse Anthropic event: {}", json_str);
+                            }
+                        }
+                    }
+                }
+                Err(e) => yield Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
+            }
+        }
+    };
+
+    Ok(Box::pin(output_stream))
 }

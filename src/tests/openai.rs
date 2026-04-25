@@ -1,9 +1,11 @@
 // src/tests/openai.rs
 
-#[cfg(test)]
-mod tests {
-    use crate::openai::{call_gpt, get_embedding};
-    use crate::structs::general::{ Message, MessageContent };
+    #[cfg(test)]
+    mod tests {
+        use futures::stream::StreamExt;
+        use crate::llm::{LLM, Access};
+        use crate::openai::{call_gpt, get_embedding};
+        use crate::structs::general::{ Message, MessageContent, LlmChunk };
 
     #[tokio::test]
     async fn test_call_gpt() {
@@ -115,6 +117,55 @@ mod tests {
                 println!("Embedding vector length: {}", embedding.len());
             }
             Err(err) => panic!("Failed to get embedding with dimensions: {}", err),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_call_gpt_streaming() {
+        let llm = LLM::OpenAI;
+        let user_message = Message {
+            role: "user".to_string(),
+            content: MessageContent::Text("Write a long 2-paragraph thesis about ways to bring gravity boots into reality.".to_string()),
+        };
+        let messages = vec![user_message];
+
+        // We call the Access trait method
+        let stream_result = llm.send_streaming_convo_message(messages, None, None).await;
+        
+        match stream_result {
+            Ok(mut stream) => {
+                let mut full_text = String::new();
+                let mut reasoning_text = String::new();
+                let mut received_done = false;
+
+                println!("--- Starting Stream ---");
+                while let Some(chunk_result) = stream.next().await {
+                    match chunk_result {
+                        Ok(chunk) => {
+                            match chunk {
+                                LlmChunk::Text(t) => {
+                                    print!("{}", t); // Print in real-time to console
+                                    full_text.push_str(&t);
+                                }
+                                LlmChunk::Reasoning(r) => {
+                                    println!("\n[Reasoning]: {}", r);
+                                    reasoning_text.push_str(&r);
+                                }
+                                LlmChunk::Done => {
+                                    received_done = true;
+                                    println!("\n--- Stream Done ---");
+                                }
+                            }
+                        }
+                        Err(e) => panic!("Stream encountered an error: {}", e),
+                    }
+                }
+
+                assert!(!full_text.is_empty(), "The stream should have returned some text");
+                assert!(received_done, "The stream should have ended with LlmChunk::Done");
+                println!("\nFinal Collected Text: {}", full_text);
+            }
+            Err(e) => panic!("Failed to initiate streaming call: {}", e),
         }
     }
 }
