@@ -1,9 +1,10 @@
 // src/gemini/api/call_gemini.rs
 use std::env;
+use std::time::Duration;
 use dotenv::dotenv;
 use serde_json::json; // Removed Map, Value
 
-use crate::errors::GeneralError;
+use crate::errors::{GeneralError, with_retry};
 use crate::structs::general::{ Message, Content, Part };
 use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool};
 use crate::gemini::request::gemini_request;
@@ -78,8 +79,19 @@ pub async fn call_gemini(
         tools: tools_option,
     };
 
-    let response = gemini_request(&url, &api_key, &request, None).await?;
-    let gemini_response: GeminiResponse = parse_gemini_response(response).await?;
+    // Wrap the request and parsing logic in with_retry
+    with_retry(|| async {
+        let response = gemini_request(&url, &api_key, &request, None).await?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(Box::new(GeneralError {
+                message: format!("Gemini API returned error {}: {}", status, body),
+            }) as Box<dyn std::error::Error + Send + Sync>);
+        }
 
-    Ok(gemini_response)
+        let gemini_response: GeminiResponse = parse_gemini_response(response).await?;
+        Ok(gemini_response)
+    }, 3, Duration::from_secs(1)).await
 }

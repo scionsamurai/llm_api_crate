@@ -1,10 +1,11 @@
 // src/gemini/api/conversation_gemini_call.rs
 use reqwest::header::{HeaderMap, HeaderValue};
 use std::env;
+use std::time::Duration;
 use dotenv::dotenv;
 use serde_json::json; // Removed Map, Value
 
-use crate::errors::GeneralError;
+use crate::errors::{GeneralError, with_retry};
 use crate::structs::general::Content;
 use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool, GeminiResponse};
 use crate::gemini::request::gemini_request;
@@ -70,7 +71,19 @@ pub async fn conversation_gemini_call(
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", HeaderValue::from_static("application/json"));
 
-    let response = gemini_request(&url, &api_key, &request, Some(headers)).await?;
-    let gemini_response: GeminiResponse = parse_gemini_response(response).await?;
-    Ok(gemini_response)
+    // Wrap the request and parsing logic in with_retry
+    with_retry(|| async {
+        let response = gemini_request(&url, &api_key, &request, Some(headers.clone())).await?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(Box::new(GeneralError {
+                message: format!("Gemini API returned error {}: {}", status, body),
+            }) as Box<dyn std::error::Error + Send + Sync>);
+        }
+
+        let gemini_response: GeminiResponse = parse_gemini_response(response).await?;
+        Ok(gemini_response)
+    }, 3, Duration::from_secs(1)).await
 }

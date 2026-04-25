@@ -1,9 +1,10 @@
 // src/llama_server.rs
 use reqwest::Client;
 use std::env;
+use std::time::Duration;
 use dotenv::dotenv;
 
-use crate::errors::GeneralError;
+use crate::errors::{GeneralError, with_retry};
 use crate::structs::general::{ Message, MessageContent, LlmResponse };
 use crate::structs::openai::{ChatCompletion, EmbeddingRequest};
 use crate::models::openai::{APIResponse, ErrorResponse, EmbeddingResponse};
@@ -115,54 +116,57 @@ pub async fn call_llama_openai_compat(
     }
 
     let client = Client::new();
-    let res = client
-        .post(&url)
-        .json(&request_body)
-        .send()
-        .await
-        .map_err(|e| {
-            Box::new(GeneralError {
-                message: format!("Failed to send request to Llama Server: {}", e),
-            }) as Box<dyn std::error::Error + Send + Sync>
-        })?;
 
-    let status = res.status();
-    let rspns_strng = res.text().await.unwrap_or_default();
+    with_retry(|| async {
+        let res = client
+            .post(&url)
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| {
+                Box::new(GeneralError {
+                    message: format!("Failed to send request to Llama Server: {}", e),
+                }) as Box<dyn std::error::Error + Send + Sync>
+            })?;
 
-    if !status.is_success() {
-        return Err(Box::new(GeneralError {
-            message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
-        }) as Box<dyn std::error::Error + Send + Sync>);
-    }
+        let status = res.status();
+        let rspns_strng = res.text().await.unwrap_or_default();
 
-    match serde_json::from_str::<APIResponse>(&rspns_strng) {
-        Ok(api_response) => {
-            let message = &api_response.choices[0].message;
-            let raw_text = &message.content;
-            
-            // If the server native-parsed it, use it. Otherwise, run our manual fallback parser!
-            let (final_text, final_reasoning) = if let Some(reasoning) = &message.reasoning_content {
-                (raw_text.clone(), Some(reasoning.clone()))
-            } else {
-                parse_raw_reasoning(raw_text)
-            };
+        if !status.is_success() {
+            return Err(Box::new(GeneralError {
+                message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
+            }) as Box<dyn std::error::Error + Send + Sync>);
+        }
 
-            Ok(LlmResponse { 
-                text: final_text, 
-                reasoning: final_reasoning 
-            })
-        },
-        Err(_) => {
-            match serde_json::from_str::<ErrorResponse>(&rspns_strng) {
-                Ok(err) => Err(Box::new(GeneralError {
-                    message: format!("Llama Server API Error: {}", err.error.message),
-                }) as Box<dyn std::error::Error + Send + Sync>),
-                Err(e) => Err(Box::new(GeneralError {
-                    message: format!("Failed to parse JSON response: {} - Raw: {}", e, rspns_strng),
-                }) as Box<dyn std::error::Error + Send + Sync>),
+        match serde_json::from_str::<APIResponse>(&rspns_strng) {
+            Ok(api_response) => {
+                let message = &api_response.choices[0].message;
+                let raw_text = &message.content;
+                
+                // If the server native-parsed it, use it. Otherwise, run our manual fallback parser!
+                let (final_text, final_reasoning) = if let Some(reasoning) = &message.reasoning_content {
+                    (raw_text.clone(), Some(reasoning.clone()))
+                } else {
+                    parse_raw_reasoning(raw_text)
+                };
+
+                Ok(LlmResponse { 
+                    text: final_text, 
+                    reasoning: final_reasoning 
+                })
+            },
+            Err(_) => {
+                match serde_json::from_str::<ErrorResponse>(&rspns_strng) {
+                    Ok(err) => Err(Box::new(GeneralError {
+                        message: format!("Llama Server API Error: {}", err.error.message),
+                    }) as Box<dyn std::error::Error + Send + Sync>),
+                    Err(e) => Err(Box::new(GeneralError {
+                        message: format!("Failed to parse JSON response: {} - Raw: {}", e, rspns_strng),
+                    }) as Box<dyn std::error::Error + Send + Sync>),
+                }
             }
         }
-    }
+    }, 3, Duration::from_secs(1)).await
 }
 
 pub async fn call_llama_legacy(
@@ -208,39 +212,42 @@ pub async fn call_llama_legacy(
     }
 
     let client = Client::new();
-    let res = client
-        .post(&url)
-        .json(&request_body)
-        .send()
-        .await
-        .map_err(|e| {
+
+    with_retry(|| async {
+        let res = client
+            .post(&url)
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| {
+                Box::new(GeneralError {
+                    message: format!("Failed to send request to Llama Server (Legacy): {}", e),
+                }) as Box<dyn std::error::Error + Send + Sync>
+            })?;
+
+        let status = res.status();
+        let rspns_strng = res.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            return Err(Box::new(GeneralError {
+                message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
+            }) as Box<dyn std::error::Error + Send + Sync>);
+        }
+
+        let parsed: LlamaCompletionResponse = serde_json::from_str(&rspns_strng).map_err(|e| {
             Box::new(GeneralError {
-                message: format!("Failed to send request to Llama Server (Legacy): {}", e),
+                message: format!("Failed to parse legacy JSON: {} - Raw: {}", e, rspns_strng),
             }) as Box<dyn std::error::Error + Send + Sync>
         })?;
 
-    let status = res.status();
-    let rspns_strng = res.text().await.unwrap_or_default();
+        // --- Run the manual fallback parser on legacy output! ---
+        let (final_text, final_reasoning) = parse_raw_reasoning(&parsed.content);
 
-    if !status.is_success() {
-        return Err(Box::new(GeneralError {
-            message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
-        }) as Box<dyn std::error::Error + Send + Sync>);
-    }
-
-    let parsed: LlamaCompletionResponse = serde_json::from_str(&rspns_strng).map_err(|e| {
-        Box::new(GeneralError {
-            message: format!("Failed to parse legacy JSON: {} - Raw: {}", e, rspns_strng),
-        }) as Box<dyn std::error::Error + Send + Sync>
-    })?;
-
-    // --- Run the manual fallback parser on legacy output! ---
-    let (final_text, final_reasoning) = parse_raw_reasoning(&parsed.content);
-
-    Ok(LlmResponse {
-        text: final_text,
-        reasoning: final_reasoning,
-    })
+        Ok(LlmResponse {
+            text: final_text,
+            reasoning: final_reasoning,
+        })
+    }, 3, Duration::from_secs(1)).await
 }
 
 pub async fn call_llama_embeddings(
@@ -272,39 +279,41 @@ pub async fn call_llama_embeddings(
         encoding_format: "float".to_string(),
     };
 
-    let res = client
-        .post(&url)
-        .json(&embedding_request)
-        .send()
-        .await
-        .map_err(|e| {
-            Box::new(GeneralError {
-                message: format!("Failed to send request to Llama Server Embeddings: {}", e),
-            }) as Box<dyn std::error::Error + Send + Sync>
-        })?;
+    with_retry(|| async {
+        let res = client
+            .post(&url)
+            .json(&embedding_request)
+            .send()
+            .await
+            .map_err(|e| {
+                Box::new(GeneralError {
+                    message: format!("Failed to send request to Llama Server Embeddings: {}", e),
+                }) as Box<dyn std::error::Error + Send + Sync>
+            })?;
 
-    let status = res.status();
-    let rspns_strng = res.text().await.unwrap_or_default();
+        let status = res.status();
+        let rspns_strng = res.text().await.unwrap_or_default();
 
-    if !status.is_success() {
-        return Err(Box::new(GeneralError {
-            message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
-        }) as Box<dyn std::error::Error + Send + Sync>);
-    }
+        if !status.is_success() {
+            return Err(Box::new(GeneralError {
+                message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
+            }) as Box<dyn std::error::Error + Send + Sync>);
+        }
 
-    match serde_json::from_str::<EmbeddingResponse>(&rspns_strng) {
-        Ok(api_response) => {
-            if let Some(data) = api_response.data.first() {
-                Ok(data.embedding.clone())
-            } else {
-                Err(Box::new(GeneralError {
-                    message: "No embedding data found in Llama Server response".to_string(),
-                }) as Box<dyn std::error::Error + Send + Sync>)
-            }
-        },
-        Err(e) => Err(Box::new(GeneralError {
-            message: format!("Failed to parse Llama embedding response: {} - Raw: {}", e, rspns_strng),
-        }) as Box<dyn std::error::Error + Send + Sync>),
-    }
+        match serde_json::from_str::<EmbeddingResponse>(&rspns_strng) {
+            Ok(api_response) => {
+                if let Some(data) = api_response.data.first() {
+                    Ok(data.embedding.clone())
+                } else {
+                    Err(Box::new(GeneralError {
+                        message: "No embedding data found in Llama Server response".to_string(),
+                    }) as Box<dyn std::error::Error + Send + Sync>)
+                }
+            },
+            Err(e) => Err(Box::new(GeneralError {
+                message: format!("Failed to parse Llama embedding response: {} - Raw: {}", e, rspns_strng),
+            }) as Box<dyn std::error::Error + Send + Sync>),
+        }
+    }, 3, Duration::from_secs(1)).await
 }
     
