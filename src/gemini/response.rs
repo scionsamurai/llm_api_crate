@@ -58,8 +58,8 @@ pub fn gemini_to_llm_response(
         }
     }
 
-    println!("Extracted text from Gemini response: {}", text);
-    println!("Extracted reasoning from Gemini response: {:#?}", reasoning);
+    // println!("Extracted text from Gemini response: {}", text);
+    // println!("Extracted reasoning from Gemini response: {:#?}", reasoning);
     Ok(LlmResponse { text, reasoning })
 }
 

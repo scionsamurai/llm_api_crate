@@ -141,6 +141,8 @@ pub async fn call_llama_openai_compat(
             }) as Box<dyn std::error::Error + Send + Sync>);
         }
 
+        // println!("Raw Llama Server Response: {}", rspns_strng);
+
         match serde_json::from_str::<APIResponse>(&rspns_strng) {
             Ok(api_response) => {
                 let message = &api_response.choices[0].message;
