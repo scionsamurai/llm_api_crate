@@ -35,7 +35,7 @@ pub async fn count_gemini_tokens(
     let res = gemini_request(&url, &api_key, &request, Some(headers)).await?;
 
     let rspns_strng = res.text().await.map_err(|e: reqwest::Error| {
-        println!("------------d------------------{:?}", e);
+        // println!("------------d------------------{:?}", e);
         Box::new(GeneralError {
             message: format!("Failed to read response from Gemini API: {}", e.to_string()),
         }) as Box<dyn std::error::Error + Send + Sync>

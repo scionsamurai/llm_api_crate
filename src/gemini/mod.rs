@@ -31,7 +31,7 @@ mod tests {
         match res {
             Ok(gemini_response) => {
                 let res_str = gemini_response.candidates[0].content.parts[0].text.clone();
-                println!("res: {}", res_str.as_ref().map_or(false, |text| !text.is_empty()));
+                // println!("res: {}", res_str.as_ref().map_or(false, |text| !text.is_empty()));
                 assert!(res_str.as_ref().map_or(false, |text| !text.is_empty()));
             }
             Err(err) => {
@@ -90,28 +90,28 @@ mod tests {
         let messages: Vec<Message> = vec![message];
 
         let config = LlmConfig::new().with_grounding_with_search(true);
-        println!("LlmConfig: {:?}", config);
+        // println!("LlmConfig: {:?}", config);
         let res = call_gemini(messages, None, Some(&config)).await; // Now returns Result<GeminiResponse, ...>
 
         match res {
             Ok(gemini_response) => {
-                println!("Parsed GeminiResponse: {:?}", gemini_response); // Print the full struct for debugging
+                // println!("Parsed GeminiResponse: {:?}", gemini_response); // Print the full struct for debugging
                 // Access text for a basic assertion
                 let res_str = gemini_response.candidates.get(0).map(|c| c.content.parts.get(0).map(|p| p.text.clone())).flatten().unwrap_or_default();
-                println!("Extracted text from Gemini API: {:?}", res_str);
+                // println!("Extracted text from Gemini API: {:?}", res_str);
                 assert!(!res_str.as_ref().map_or(false, |text| !text.is_empty()));
 
                 // Check for groundingMetadata directly from the parsed response
                 if let Some(candidate) = gemini_response.candidates.get(0) {
                     if candidate.grounding_metadata.is_some() {
-                        println!("Grounding metadata found!");
+                        // println!("Grounding metadata found!");
                         assert!(true); // Grounding metadata exists
                     } else {
-                        println!("No grounding metadata found in the response.");
+                        // println!("No grounding metadata found in the response.");
                         assert!(false, "Grounding metadata should be present when grounding is enabled.");
                     }
                 } else {
-                    println!("No candidates found in the response.");
+                    // println!("No candidates found in the response.");
                     assert!(false, "Expected at least one candidate in the response.");
                 }
             }

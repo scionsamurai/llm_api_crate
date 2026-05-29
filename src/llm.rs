@@ -126,7 +126,7 @@ impl Access for LLM {
                     .collect();
 
                 let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
-                println!("Raw Gemini Response: {:#?}", gemini_response);
+                // println!("Raw Gemini Response: {:#?}", gemini_response);
                 // REFACTORED: Using the centralized helper
                 gemini_to_llm_response(gemini_response)
             }
