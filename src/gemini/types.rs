@@ -1,3 +1,4 @@
+// src/gemini/types.rs
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -10,7 +11,7 @@ pub struct GenerationConfig {
     pub temperature: Option<f64>,
     #[serde(rename = "thinkingBudget", skip_serializing_if = "Option::is_none")]
     pub thinking_budget: Option<i32>,
-    // Add other generation config here if needed, e.g., top_p, top_k, candidate_count
+    // Add other generation config options here if needed, e.g., top_p, top_k, candidate_count
 }
 
 // New: Struct for tools (like google_search)
@@ -67,6 +68,9 @@ pub struct GroundingMetadata {
     pub web_search_queries: Option<Vec<String>>,
     #[serde(rename = "searchEntryPoint")]
     pub search_entry_point: Option<SearchEntryPoint>,
+    // Add other grounding fields if they exist in the response and you need them
+    // pub groundingChunks: Option<Vec<GroundingChunk>>,
+    // pub groundingSupports: Option<Vec<GroundingSupport>>,
 }
 
 #[derive(Debug, Deserialize)]

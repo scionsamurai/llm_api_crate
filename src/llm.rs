@@ -6,7 +6,7 @@ use crate::anthropic::call_anthropic;
 use crate::models::gemini::ModelInfo;
 use crate::errors::GeneralError;
 use futures::stream::BoxStream;
-use crate::structs::general::{Message, LlmResponse, LlmChunk, MessageContent}; 
+use crate::structs::general::{Message, Content, Part, LlmResponse, LlmChunk}; 
 use crate::config::LlmConfig;
 
 pub enum LLM {
@@ -20,7 +20,7 @@ pub enum LLM {
 pub trait Access {
     async fn send_single_message(
         &self,
-        content: MessageContent,
+        message: &str,
         model: Option<&str>,
         config: Option<&LlmConfig>,
     ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>;
@@ -61,39 +61,44 @@ pub trait Access {
 #[async_trait]
 impl Access for LLM {
     
+    // REFACTORED: Now just a wrapper for send_convo_message
     async fn send_single_message(
         &self,
-        content: MessageContent,
+        message: &str,
         model: Option<&str>,
         config: Option<&LlmConfig>,
     ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>> {
         match self {
             LLM::OpenAI => {
                 let openai_message: Message = Message {
-                    role: "user".to_string(),
-                    content,
-                };
+            role: "user".to_string(),
+            content: message.into(),
+        };
                 call_gpt(vec![openai_message], model, config).await 
             }
             LLM::Gemini => {
                 let gemini_message: Message = Message {
                     role: "user".to_string(),
-                    content,
+                    content: message.into(),
                 };
+                // Call the API
                 let gemini_response = call_gemini(vec![gemini_message], model, config).await?;
+                
+                // REFACTORED: Use the centralized helper instead of manual extraction.
+                // This fixes the type mismatch error and handles the ThoughtContent enum correctly.
                 gemini_to_llm_response(gemini_response)
             }
             LLM::Anthropic => {
                 let anthropic_message: Message = Message {
                     role: "user".to_string(),
-                    content,
+                    content: message.into(),
                 };
                 call_anthropic(vec![anthropic_message], model, config).await 
             }
             LLM::LlamaServer => {
                 let llama_message: Message = Message {
                     role: "user".to_string(),
-                    content,
+                    content: message.into(),
                 };
                 crate::llama_server::call_llama_openai_compat(vec![llama_message], model, config).await
             }
@@ -109,7 +114,20 @@ impl Access for LLM {
         match self {
             LLM::OpenAI => call_gpt(messages, model, config).await,
             LLM::Gemini => {
-                let gemini_response = conversation_gemini_call(messages, model, config).await?;
+                let gemini_messages: Vec<Content> = messages
+                    .into_iter()
+                    .map(|msg| Content {
+                        role: msg.role,
+                        parts: vec![Part {
+                            text: Some(msg.content.extract_text()),
+                            thought: None,
+                        }],
+                    })
+                    .collect();
+
+                let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
+                // println!("Raw Gemini Response: {:#?}", gemini_response);
+                // REFACTORED: Using the centralized helper
                 gemini_to_llm_response(gemini_response)
             }
             LLM::Anthropic => call_anthropic(messages, model, config).await, 
