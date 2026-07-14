@@ -67,7 +67,7 @@ pub async fn call_llama_openai_compat(
 
     let mut request_body = ChatCompletion {
         model: model_name, 
-        messages: processed_messages.into_iter().map(crate::openai::transform_message).collect(),
+        messages: processed_messages,
         ..Default::default()
     };
 
@@ -129,7 +129,7 @@ pub async fn call_llama_stream(
 
     let mut request_body = ChatCompletion {
         model: model_name, 
-        messages: processed_messages.into_iter().map(crate::openai::transform_message).collect(),
+        messages: processed_messages,
         stream: Some(true),
         ..Default::default()
     };

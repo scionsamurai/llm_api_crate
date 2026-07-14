@@ -17,7 +17,7 @@ const CHAT_COMPLETION_MODEL: &str = "gpt-4o";
 const EMBEDDING_MODEL: &str = "text-embedding-3-small";
 const EMBEDDING_ENCODING_FORMAT: &str = "float";
 
-pub fn transform_message(msg: Message) -> OpenAiMessage {
+fn transform_message(msg: Message) -> OpenAiMessage {
     let content = match &msg.content {
         MessageContent::Text(text) => OpenAiContent::Text(text.clone()),
         MessageContent::Array(parts) => {
