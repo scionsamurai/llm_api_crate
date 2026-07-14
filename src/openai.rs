@@ -1,4 +1,3 @@
-// src/openai.rs
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::Client;
 use std::env;
@@ -9,14 +8,37 @@ use async_stream::stream;
 use serde::Deserialize;
 
 use crate::errors::GeneralError;
-use crate::structs::general::{Message, LlmResponse, LlmChunk}; 
-use crate::structs::openai::{ChatCompletion, EmbeddingRequest};
+use crate::structs::general::{Message, MessageContent, MessagePart, ImageSource, LlmResponse, LlmChunk}; 
+use crate::structs::openai::{ChatCompletion, EmbeddingRequest, OpenAiMessage, OpenAiContent, OpenAiContentBlock, OpenAiImageUrl};
 use crate::models::openai::{APIResponse, ErrorResponse, EmbeddingResponse};
-use crate::config::LlmConfig; // <-- Import config
+use crate::config::LlmConfig;
 
-const CHAT_COMPLETION_MODEL: &str = "gpt-4o"; // Updated default
+const CHAT_COMPLETION_MODEL: &str = "gpt-4o";
 const EMBEDDING_MODEL: &str = "text-embedding-3-small";
 const EMBEDDING_ENCODING_FORMAT: &str = "float";
+
+fn transform_message(msg: Message) -> OpenAiMessage {
+    let content = match &msg.content {
+        MessageContent::Text(text) => OpenAiContent::Text(text.clone()),
+        MessageContent::Array(parts) => {
+            let blocks = parts.iter().map(|p| {
+                if p.r#type == "text" {
+                    OpenAiContentBlock::Text { text: p.text.clone().unwrap_or_default() }
+                } else if p.r#type == "image_url" {
+                    OpenAiContentBlock::Image { 
+                        image_url: OpenAiImageUrl { 
+                            url: p.image_url.as_ref().map(|s| s.to_data_url()).unwrap_or_default() 
+                        } 
+                    }
+                } else {
+                    OpenAiContentBlock::Text { text: "".to_string() }
+                }
+            }).collect();
+            OpenAiContent::Array(blocks)
+        }
+    };
+    OpenAiMessage { role: msg.role, content }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct StreamResponse {
@@ -58,9 +80,9 @@ pub async fn call_gpt_stream(
 
     let mut chat_completion = ChatCompletion {
         model: model_name,
-        messages,
+        messages: messages.into_iter().map(transform_message).collect(),
         temperature: None,
-        stream: Some(true), // MUST be true for streaming
+        stream: Some(true),
         max_tokens: None,
         max_completion_tokens: None,
         stop: None,
@@ -70,7 +92,6 @@ pub async fn call_gpt_stream(
         response_format: None,
     };
 
-    // Apply config (Same logic as your existing call_gpt)
     if let Some(cfg) = config {
         if is_reasoning_model {
             chat_completion.max_completion_tokens = cfg.max_tokens;
@@ -85,28 +106,21 @@ pub async fn call_gpt_stream(
     }
 
     let res = client.post(url).json(&chat_completion).send().await?;
-
     if !res.status().is_success() {
         let err_text = res.text().await?;
         return Err(Box::new(GeneralError { message: format!("OpenAI Stream Error: {}", err_text) }));
     }
 
-    // The magic happens here: we convert the byte stream into an LlmChunk stream
     let byte_stream = res.bytes_stream();
-
     let output_stream = stream! {
         let mut buffer = String::new();
         let mut bytes_stream = byte_stream;
-
         while let Some(item) = bytes_stream.next().await {
             match item {
                 Ok(bytes) => {
                     buffer.push_str(&String::from_utf8_lossy(&bytes));
-                    
-                    // SSE events are delimited by double newlines
                     while let Some(newline_idx) = buffer.find('\n') {
                         let line = buffer.drain(..newline_idx + 1).collect::<String>().trim().to_string();
-                        
                         if line.is_empty() { continue; }
                         if line == "data: [DONE]" {
                             yield Ok(LlmChunk::Done);
@@ -125,10 +139,7 @@ pub async fn call_gpt_stream(
                                         }
                                     }
                                 },
-                                Err(_e) => {
-                                    // Some lines might be partial or metadata, we can choose to ignore or yield error
-                                    // For OpenAI, we generally ignore non-JSON "data:" lines unless they are [DONE]
-                                }
+                                Err(_) => {}
                             }
                         }
                     }
@@ -137,56 +148,36 @@ pub async fn call_gpt_stream(
             }
         }
     };
-
     Ok(Box::pin(output_stream))
 }
 
 pub async fn call_gpt(
     messages: Vec<Message>,
-    model: Option<&str>, // <-- Added dynamic model
-    config: Option<&LlmConfig>, // <-- Added dynamic config
+    model: Option<&str>,
+    config: Option<&LlmConfig>,
 ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>> { 
     dotenv().ok();
-
-    let api_key: String =
-        env::var("OPEN_AI_KEY").expect("OPEN AI KEY not found in environment variables");
-    let api_org: String =
-        env::var("OPEN_AI_ORG").unwrap_or_default(); // Made optional since not everyone uses orgs
-
+    let api_key: String = env::var("OPEN_AI_KEY").expect("OPEN AI KEY not found");
+    let api_org: String = env::var("OPEN_AI_ORG").unwrap_or_default();
     let url: &str = "https://api.openai.com/v1/chat/completions";
 
     let mut headers: HeaderMap = HeaderMap::new();
-    headers.insert(
-        "authorization",
-        HeaderValue::from_str(&format!("Bearer {}", api_key))
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
-    );
-    
+    headers.insert("authorization", HeaderValue::from_str(&format!("Bearer {}", api_key)).map_err(|e| Box::new(e))?);
     if !api_org.is_empty() {
-        headers.insert(
-            "OpenAI-Organization",
-            HeaderValue::from_str(api_org.as_str())
-                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
-        );
+        headers.insert("OpenAI-Organization", HeaderValue::from_str(api_org.as_str()).map_err(|e| Box::new(e))?);
     }
 
-    let client = Client::builder()
-        .default_headers(headers)
-        .build()
-        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
-
+    let client = Client::builder().default_headers(headers).build()?;
     let model_name = model.unwrap_or(CHAT_COMPLETION_MODEL).to_string();
-    
-    // Check if we are using an OpenAI reasoning model (o1, o3, etc.)
     let is_reasoning_model = model_name.starts_with("o1") || model_name.starts_with("o3");
 
     let mut chat_completion = ChatCompletion {
         model: model_name,
-        messages,
+        messages: messages.into_iter().map(transform_message).collect(),
         temperature: None,
         stream: None,
         max_tokens: None,
-        max_completion_tokens: None, // NEW
+        max_completion_tokens: None,
         stop: None,
         top_k: None,
         top_p: None,
@@ -196,20 +187,14 @@ pub async fn call_gpt(
 
     if let Some(cfg) = config {
         if is_reasoning_model {
-            // Reasoning models strictly use max_completion_tokens
             chat_completion.max_completion_tokens = cfg.max_tokens;
-            
-            // Reasoning models generally reject temperature or only accept 1.0
             if let Some(temp) = cfg.temperature {
-                if (temp - 1.0).abs() < f64::EPSILON {
-                    chat_completion.temperature = Some(1.0);
-                }
+                if (temp - 1.0).abs() < f64::EPSILON { chat_completion.temperature = Some(1.0); }
             }
         } else {
             chat_completion.temperature = cfg.temperature.map(|t| t as f32);
             chat_completion.max_tokens = cfg.max_tokens;
         }
-        
         chat_completion.stream = cfg.stream;
         chat_completion.stop = cfg.stop.clone();
         chat_completion.top_k = cfg.top_k;
@@ -217,29 +202,12 @@ pub async fn call_gpt(
         chat_completion.response_format = cfg.json_schema.clone();
     }
 
-    let res = client
-        .post(url)
-        .json(&chat_completion)
-        .send()
-        .await
-        .map_err(|e| {
-            println!("{:?}", e);
-            Box::new(GeneralError {
-                message: format!("Failed to send request to OpenAI Chat Completion API: {}", e),
-            }) as Box<dyn std::error::Error + Send + Sync>
-        })?;
-
+    let res = client.post(url).json(&chat_completion).send().await.map_err(|e| Box::new(GeneralError { message: e.to_string() }))?;
     let status = res.status();
-    let rspns_strng = res.text().await.map_err(|e: reqwest::Error| {
-        Box::new(GeneralError {
-            message: format!("Failed to read response from OpenAI Chat Completion API: {}", e),
-        }) as Box<dyn std::error::Error + Send + Sync>
-    })?;
+    let rspns_strng = res.text().await.map_err(|e| Box::new(GeneralError { message: e.to_string() }))?;
 
     if !status.is_success() {
-        return Err(Box::new(GeneralError {
-            message: format!("OpenAI API Error (HTTP {}): {}", status, rspns_strng),
-        }));
+        return Err(Box::new(GeneralError { message: format!("OpenAI API Error (HTTP {}): {}", status, rspns_strng) }));
     }
 
     match serde_json::from_str::<APIResponse>(&rspns_strng) {
@@ -249,99 +217,52 @@ pub async fn call_gpt(
                 reasoning: api_response.choices[0].message.reasoning_content.clone(),
             })
         },
-        Err(e) => {
-            Err(Box::new(GeneralError {
-                message: format!("Failed to parse response from OpenAI API: {} - Raw Response: {}", e, rspns_strng),
-            }))
-        }
+        Err(e) => Err(Box::new(GeneralError { message: format!("Failed to parse response: {} - Raw: {}", e, rspns_strng) })),
     }
 }
 
 pub async fn get_embedding(
     input: String,
-    model: Option<&str>, // Added model parameter
+    model: Option<&str>,
     dimensions: Option<u32>,
-    _config: Option<&LlmConfig>, // Added, prefixed with _ as it's currently unused
+    _config: Option<&LlmConfig>,
 ) -> Result<Vec<f32>, Box<dyn std::error::Error + Send + Sync>> {
-    
     dotenv().ok();
-
-    let api_key: String =
-        env::var("OPEN_AI_KEY").expect("OPEN AI KEY not found in environment variables");
-    let api_org: String =
-        env::var("OPEN_AI_ORG").unwrap_or_default(); // Changed to unwrap_or_default for robustness
-
+    let api_key: String = env::var("OPEN_AI_KEY").expect("OPEN AI KEY not found");
+    let api_org: String = env::var("OPEN_AI_ORG").unwrap_or_default();
     let url: &str = "https://api.openai.com/v1/embeddings";
 
     let mut headers: HeaderMap = HeaderMap::new();
-    headers.insert(
-        "authorization",
-        HeaderValue::from_str(&format!("Bearer {}", api_key))
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
-    );
-    
+    headers.insert("authorization", HeaderValue::from_str(&format!("Bearer {}", api_key)).map_err(|e| Box::new(e))?);
     if !api_org.is_empty() {
-        headers.insert(
-            "OpenAI-Organization",
-            HeaderValue::from_str(api_org.as_str())
-                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?,
-        );
+        headers.insert("OpenAI-Organization", HeaderValue::from_str(api_org.as_str()).map_err(|e| Box::new(e))?);
     }
-    headers.insert(
-        "Content-Type",
-        HeaderValue::from_static("application/json"),
-    );
+    headers.insert("Content-Type", HeaderValue::from_static("application/json"));
 
-    let client = Client::builder()
-        .default_headers(headers)
-        .build()
-        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
-
+    let client = Client::builder().default_headers(headers).build()?;
     let embedding_request = EmbeddingRequest {
-        model: model.unwrap_or(EMBEDDING_MODEL).to_string(), // Use provided model or default
+        model: model.unwrap_or(EMBEDDING_MODEL).to_string(),
         input,
         dimensions,
         encoding_format: EMBEDDING_ENCODING_FORMAT.to_string(),
     };
 
-    let res = client
-        .post(url)
-        .json(&embedding_request)
-        .send()
-        .await
-        .map_err(|e| {
-            println!("{:?}", e);
-            Box::new(GeneralError {
-                message: format!("Failed to send request to OpenAI Embeddings API: {}", e),
-            }) as Box<dyn std::error::Error + Send + Sync>
-        })?;
-
-    let rspns_strng = res.text().await.map_err(|e: reqwest::Error| {
-        Box::new(GeneralError {
-            message: format!("Failed to read response from OpenAI Embeddings API: {}", e),
-        }) as Box<dyn std::error::Error + Send + Sync>
-    })?;
+    let res = client.post(url).json(&embedding_request).send().await.map_err(|e| Box::new(GeneralError { message: e.to_string() }))?;
+    let rspns_strng = res.text().await.map_err(|e| Box::new(GeneralError { message: e.to_string() }))?;
 
     match serde_json::from_str::<EmbeddingResponse>(&rspns_strng) {
         Ok(api_response) => {
             if let Some(data) = api_response.data.first() {
                 Ok(data.embedding.clone())
             } else {
-                Err(Box::new(GeneralError {
-                    message: "No embedding data found in the OpenAI Embeddings API response".to_string(),
-                }) as Box<dyn std::error::Error + Send + Sync>)
+                Err(Box::new(GeneralError { message: "No embedding data found".to_string() }))
             }
-        }
+        },
         Err(_) => {
             match serde_json::from_str::<ErrorResponse>(&rspns_strng) {
-                Ok(err) => Err(Box::new(GeneralError {
-                    message: format!("OpenAI Embeddings API Error: {}", err.error.message),
-                }) as Box<dyn std::error::Error + Send + Sync>),
-                Err(e) => Err(Box::new(GeneralError {
-                    message: format!("Failed to parse error response from OpenAI Embeddings API: {} - Raw Response: {}", e, rspns_strng),
-                }) as Box<dyn std::error::Error + Send + Sync>), // Ensure this also returns a boxed dynamic error
+                Ok(err) => Err(Box::new(GeneralError { message: err.error.message })),
+                Err(e) => Err(Box::new(GeneralError { message: format!("Failed to parse error: {}", e) })),
             }
         }
     }
 }
-    

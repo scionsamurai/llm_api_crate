@@ -1,4 +1,3 @@
-// src/structs/general.rs
 use serde::{Deserialize, Serialize};
 
 // --- New Unified Response Type ---
@@ -51,12 +50,24 @@ pub struct MessagePart {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub image_url: Option<ImageUrl>,
+    pub image_url: Option<ImageSource>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ImageUrl {
-    pub url: String,
+#[serde(untagged)]
+pub enum ImageSource {
+    Url(String),
+    Base64 { mime_type: String, data: String },
+}
+
+impl ImageSource {
+    /// Converts the image source into a data URL for providers that expect it (like OpenAI)
+    pub fn to_data_url(&self) -> String {
+        match self {
+            ImageSource::Url(url) => url.clone(),
+            ImageSource::Base64 { mime_type, data } => format!("data:{};base64,{}", mime_type, data),
+        }
+    }
 }
 
 // --- New: Enum to handle inconsistent 'thought' types from different models ---
@@ -86,7 +97,15 @@ pub struct Part {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub inline_data: Option<GeminiInlineData>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub thought: Option<ThoughtContent>, // Updated from Option<String>
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GeminiInlineData {
+    pub mime_type: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

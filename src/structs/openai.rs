@@ -1,12 +1,38 @@
-// src/structs/openai.rs
 use serde::Serialize;
-use crate::structs::general::Message;
+use crate::structs::general::{Message, MessageContent, MessagePart, ImageSource};
 use serde_json::Value;
+
+#[derive(Debug, Serialize)]
+pub struct OpenAiMessage {
+    pub role: String,
+    pub content: OpenAiContent,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum OpenAiContent {
+    Text(String),
+    Array(Vec<OpenAiContentBlock>),
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+pub enum OpenAiContentBlock {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "image_url")]
+    Image { image_url: OpenAiImageUrl },
+}
+
+#[derive(Debug, Serialize)]
+pub struct OpenAiImageUrl {
+    pub url: String,
+}
 
 #[derive(Debug, Serialize, Clone, Default)]
 pub struct ChatCompletion {
     pub model: String,
-    pub messages: Vec<Message>,
+    pub messages: Vec<OpenAiMessage>,
     
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
