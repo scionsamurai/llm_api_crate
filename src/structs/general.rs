@@ -43,6 +43,18 @@ impl MessageContent {
             }
         }
     }
+
+    /// Returns a vector of MessageParts regardless of whether the content is Text or Array.
+    pub fn as_parts(&self) -> Vec<MessagePart> {
+        match self {
+            MessageContent::Text(text) => vec![MessagePart {
+                r#type: "text".to_string(),
+                text: Some(text.clone()),
+                image_url: None,
+            }],
+            MessageContent::Array(parts) => parts.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

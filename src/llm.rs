@@ -84,17 +84,11 @@ impl Access for LLM {
                     .into_iter()
                     .map(|msg| Content {
                         role: msg.role,
-                        parts: vec![Part {
-                            text: Some(msg.content.extract_text()),
-                            inline_data: None,
-                            thought: None,
-                        }],
+                        parts: crate::gemini::api::call_gemini::map_message_parts_to_gemini(msg.content.as_parts()),
                     })
                     .collect();
 
                 let gemini_response = conversation_gemini_call(gemini_messages, model, config).await?;
-                // println!("Raw Gemini Response: {:#?}", gemini_response);
-                // REFACTORED: Using the centralized helper
                 gemini_to_llm_response(gemini_response)
             }
             LLM::Anthropic => call_anthropic(messages, model, config).await, 

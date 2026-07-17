@@ -18,13 +18,43 @@ pub struct ThinkingConfig {
     pub budget_tokens: usize,
 }
 
-// --- UPDATED: Added thinking and temperature ---
+#[derive(Debug, Serialize, Clone)]
+pub struct AnthropicImageSource {
+    #[serde(rename = "type")]
+    pub source_type: String, // "base64"
+    pub media_type: String,
+    pub data: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AnthropicContentBlock {
+    Text { text: String },
+    Image { source: AnthropicImageSource },
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct AnthropicMessage {
+    pub role: String,
+    pub content: Vec<AnthropicContentBlock>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AnthropicResponseBody {
+    pub content: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AnthropicResult {
+    pub response: AnthropicResponseBody,
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct AnthropicRequest {
     pub model: String,
     pub max_tokens: usize,
-    pub messages: Vec<Message>,
-    pub stream: bool, // <--- ADD THIS LINE
+    pub messages: Vec<AnthropicMessage>,
+    pub stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking: Option<ThinkingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -32,26 +62,16 @@ pub struct AnthropicRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct AnthropicResult {
-    pub response: AnthropicMessage,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AnthropicMessage {
-    pub content: String,
-}
-
-const MODEL: &str = "claude-haiku-4-5";
-const DEFAULT_MAX_TOKENS: usize = 4096; // Changed from MAX_TOKENS for clarity
-
-use std::str;
-
-#[derive(Debug, Deserialize)]
 pub struct AnthropicResponse {
     pub id: String,
     pub role: String,
     pub content: Vec<Content>,
 }
+
+const MODEL: &str = "claude-haiku-4-5";
+const DEFAULT_MAX_TOKENS: usize = 4096;
+
+use std::str;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -66,32 +86,58 @@ pub enum Content {
     Unknown,
 }
 
-    #[derive(Debug, Deserialize)]
-    #[serde(tag = "type")]
-    #[allow(dead_code)]
-    enum AnthropicEvent {
-        #[serde(rename = "message_start")]
-        MessageStart { message: serde_json::Value },
-        #[serde(rename = "content_block_start")]
-        ContentBlockStart { index: u32 },
-        #[serde(rename = "content_block_delta")]
-        ContentBlockDelta { delta: AnthropicDelta },
-        #[serde(rename = "content_block_stop")]
-        ContentBlockStop { index: u32 },
-        #[serde(rename = "message_stop")]
-        MessageStop { stop_reason: String },
-        #[serde(other)]
-        Unknown,
-    }
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+#[allow(dead_code)]
+enum AnthropicEvent {
+    #[serde(rename = "message_start")]
+    MessageStart { message: serde_json::Value },
+    #[serde(rename = "content_block_start")]
+    ContentBlockStart { index: u32 },
+    #[serde(rename = "content_block_delta")]
+    ContentBlockDelta { delta: AnthropicDelta },
+    #[serde(rename = "content_block_stop")]
+    ContentBlockStop { index: u32 },
+    #[serde(rename = "message_stop")]
+    MessageStop { stop_reason: String },
+    #[serde(other)]
+    Unknown,
+}
 
-    #[derive(Debug, Deserialize)]
-    struct AnthropicDelta {
-        pub text: Option<String>,
-        pub thinking: Option<String>,
-    }
+#[derive(Debug, Deserialize)]
+struct AnthropicDelta {
+    pub text: Option<String>,
+    pub thinking: Option<String>,
+}
 
-    // --- UPDATED: Signature now accepts model and config ---
-    pub async fn call_anthropic(
+fn map_to_anthropic_messages(messages: Vec<Message>) -> Vec<AnthropicMessage> {
+    messages.into_iter().map(|msg| {
+        let role = if msg.role == "model" { "assistant".to_string() } else { msg.role };
+        let content = msg.content.as_parts().into_iter().map(|part| {
+            if part.r#type == "text" {
+                AnthropicContentBlock::Text { text: part.text.unwrap_or_default() }
+            } else if part.r#type == "image_url" {
+                if let Some(ImageSource::Base64 { media_type, data }) = part.image_url {
+                    AnthropicContentBlock::Image {
+                        source: AnthropicImageSource {
+                            source_type: "base64".to_string(),
+                            media_type,
+                            data,
+                        }
+                    }
+                } else {
+                    AnthropicContentBlock::Text { text: "".to_string() }
+                }
+            } else {
+                AnthropicContentBlock::Text { text: "".to_string() }
+            }
+        }).collect();
+        
+        AnthropicMessage { role, content }
+    }).collect()
+}
+
+pub async fn call_anthropic(
     messages: Vec<Message>,
     model: Option<&str>,
     config: Option<&LlmConfig>,
@@ -145,33 +191,23 @@ pub enum Content {
             })
         })?;
 
-    // Convert "model" roles to "assistant" roles
-    let processed_messages = messages.into_iter().map(|mut message| {
-        if message.role == "model" {
-            message.role = "assistant".to_string();
-        }
-        message
-    }).collect::<Vec<Message>>();
+    let anthropic_messages = map_to_anthropic_messages(messages);
 
-    // --- NEW: Dynamic Model and Config Parsing ---
     let mut request = AnthropicRequest {
         model: model.unwrap_or(MODEL).to_string(),
         max_tokens: DEFAULT_MAX_TOKENS,
-        messages: processed_messages,
+        messages: anthropic_messages,
         stream: false,
         thinking: None,
         temperature: None,
     };
 
     if let Some(cfg) = config {
-        // Handle max_tokens first
         if let Some(max_t) = cfg.max_tokens {
             request.max_tokens = max_t as usize;
         }
 
-        // Handle Thinking
         if let Some(budget) = cfg.thinking_budget {
-            // Anthropic strictly requires a minimum budget of 1024
             let valid_budget = if budget < 1024 { 1024 } else { budget as usize };
             
             request.thinking = Some(ThinkingConfig {
@@ -179,14 +215,10 @@ pub enum Content {
                 budget_tokens: valid_budget,
             });
 
-            // Anthropic strictly requires max_tokens to be larger than the thinking budget
-            // We ensure max_tokens provides at least an extra 1000 tokens for the actual text response
             if request.max_tokens <= valid_budget {
                 request.max_tokens = valid_budget + 1024; 
             }
         } else if let Some(temp) = cfg.temperature {
-            // Only set temperature if thinking is NOT enabled. 
-            // Anthropic throws a 400 error if temperature is provided alongside thinking blocks.
             request.temperature = Some(temp as f32);
         }
     }
@@ -209,7 +241,6 @@ pub enum Content {
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;
 
-    // Catch HTTP errors before JSON parsing to surface API complaints (like bad budgets)
     if !status.is_success() {
         return Err(Box::new(GeneralError {
             message: format!("Anthropic API Error (HTTP {}): {}", status, rspns_strng),
@@ -222,7 +253,6 @@ pub enum Content {
         }) as Box<dyn std::error::Error + Send + Sync>
     })?;
 
-    // Extract text and reasoning blocks
     let mut text_output = String::new();
     let mut reasoning_output = None;
 
@@ -230,7 +260,7 @@ pub enum Content {
         match block {
             Content::Text { text } => text_output.push_str(&text),
             Content::Thinking { thinking, .. } => reasoning_output = Some(thinking),
-            _ => {} // Ignore redacted thinking or unknown blocks
+            _ => {}
         }
     }
 
@@ -256,15 +286,12 @@ pub async fn call_anthropic_stream(
 
     let client = Client::builder().default_headers(headers).build()?;
 
-    let processed_messages = messages.into_iter().map(|mut m| {
-        if m.role == "model" { m.role = "assistant".to_string(); }
-        m
-    }).collect();
+    let anthropic_messages = map_to_anthropic_messages(messages);
 
     let mut request = AnthropicRequest {
         model: model.unwrap_or(MODEL).to_string(),
         max_tokens: DEFAULT_MAX_TOKENS,
-        messages: processed_messages,
+        messages: anthropic_messages,
         stream: true,
         thinking: None,
         temperature: None,
@@ -300,6 +327,10 @@ pub async fn call_anthropic_stream(
                     while let Some(newline_idx) = buffer.find('\n') {
                         let line = buffer.drain(..newline_idx + 1).collect::<String>().trim().to_string();
                         if line.is_empty() { continue; }
+                        if line == "data: [DONE]" {
+                            yield Ok(LlmChunk::Done);
+                            return; 
+                        }
                         if line.starts_with("data: ") {
                             let json_str = &line[6..];
 

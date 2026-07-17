@@ -13,7 +13,7 @@ use serde_json::json;
     use crate::gemini::response::parse_gemini_response;
     use crate::config::LlmConfig;
 
-fn map_message_parts_to_gemini(parts: Vec<MessagePart>) -> Vec<Part> {
+pub fn map_message_parts_to_gemini(parts: Vec<MessagePart>) -> Vec<Part> {
     parts.into_iter().map(|p| {
         if p.r#type == "image_url" {
             if let Some(ImageSource::Base64 { media_type, data }) = p.image_url {
@@ -49,14 +49,10 @@ pub async fn call_gemini(
     );
  
     let contents: Vec<Content> = messages
-        .iter()
+        .into_iter()
         .map(|msg| Content {
-            role: msg.role.clone(),
-            parts: vec![Part {
-                text: Some(msg.content.extract_text()),
-                inline_data: None,
-                thought: None,
-            }],
+            role: msg.role,
+            parts: map_message_parts_to_gemini(msg.content.as_parts()),
         })
         .collect();
 
@@ -128,9 +124,9 @@ pub async fn call_gemini_stream(
         model_name
     );
 
-    let contents: Vec<Content> = messages.iter().map(|msg| Content {
-        role: msg.role.clone(),
-        parts: vec![Part { text: Some(msg.content.extract_text()), inline_data: None, thought: None }],
+    let contents: Vec<Content> = messages.into_iter().map(|msg| Content {
+        role: msg.role,
+        parts: map_message_parts_to_gemini(msg.content.as_parts()),
     }).collect();
 
     let mut generation_config_option = None;
