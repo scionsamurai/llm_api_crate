@@ -1,5 +1,5 @@
 // src/structs/general.rs
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 // --- New Unified Response Type ---
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,11 +57,31 @@ impl MessageContent {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ImageSource {
     Url { url: String },
     Base64 { media_type: String, data: String },
+}
+
+impl Serialize for ImageSource {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("ImageSource", 1)?;
+        match self {
+            ImageSource::Url { url } => {
+                state.serialize_field("url", url)?;
+            }
+            ImageSource::Base64 { media_type, data } => {
+                let data_uri = format!("data:{};base64,{}", media_type, data);
+                state.serialize_field("url", &data_uri)?;
+            }
+        }
+        state.end()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
