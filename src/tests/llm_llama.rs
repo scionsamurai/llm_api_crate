@@ -158,7 +158,7 @@ mod tests {
         }];
 
         let res = llm.send_convo_message(messages, Some(TEST_MODEL), None).await;
-        
+        println!("Llama multimodal response: {:?}", res);
         match res {
             Ok(response) => {
                 assert!(!response.text.is_empty(), "Llama vision response should not be empty");
