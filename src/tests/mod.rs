@@ -6,3 +6,4 @@ pub mod embeddings;
 pub mod multimodal;
 pub mod openai;
 pub mod anthropic;
+pub mod variables;
