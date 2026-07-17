@@ -149,6 +149,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_gemini_multimodal_message() {
+        use crate::structs::general::{MessagePart, ImageSource};
+        let llm = LLM::Gemini;
+        let base64_data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+        let messages = vec![Message {
+            role: "user".to_string(),
+            content: MessageContent::Array(vec![
+                MessagePart {
+                    r#type: "text".to_string(),
+                    text: Some("Describe this image:".to_string()),
+                    image_url: None,
+                },
+                MessagePart {
+                    r#type: "image_url".to_string(),
+                    text: None,
+                    image_url: Some(ImageSource::Base64 {
+                        media_type: "image/png".to_string(),
+                        data: base64_data.to_string(),
+                    }),
+                },
+            ]),
+        }];
+
+        let res = llm.send_convo_message(messages, None, None).await;
+        assert!(res.is_ok(), "Gemini failed to process multimodal message: {:?}", res.err());
+    }
+
+    #[tokio::test]
     async fn test_gemini_streaming() {
         let llm = LLM::Gemini;
         let messages = vec![Message {
