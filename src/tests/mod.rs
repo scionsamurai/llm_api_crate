@@ -4,3 +4,5 @@ pub mod llm_anthropic;
 pub mod llm_llama;
 pub mod embeddings;
 pub mod multimodal;
+pub mod openai;
+pub mod anthropic;

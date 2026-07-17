@@ -174,6 +174,7 @@ mod tests {
         }];
 
         let res = llm.send_convo_message(messages, None, None).await;
+        println!("Gemini multimodal response: {:?}", res);
         assert!(res.is_ok(), "Gemini failed to process multimodal message: {:?}", res.err());
     }
 
