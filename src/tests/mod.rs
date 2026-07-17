@@ -6,4 +6,12 @@ pub mod embeddings;
 pub mod multimodal;
 pub mod openai;
 pub mod anthropic;
-pub mod variables;
+
+use std::env;
+use dotenv::dotenv;
+
+
+pub fn get_base64_var() -> String {
+    dotenv().ok(); 
+    env::var("BASE64_DATA").unwrap_or_else(|_| "default_base64_value".to_string())
+}

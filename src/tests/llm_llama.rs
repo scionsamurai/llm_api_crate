@@ -136,7 +136,7 @@ mod tests {
         use crate::structs::general::{MessagePart, ImageSource};
         let llm = LLM::LlamaServer;
         
-        let base64_data = crate::tests::variables::BASE64_DATA;
+        let base64_data = crate::tests::get_base64_var();
 
         let messages = vec![Message {
             role: "user".to_string(),

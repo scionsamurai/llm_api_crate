@@ -3,4 +3,3 @@
 /archive
 *__pycache__*
 *pytest*
-src/tests/variables.rs
