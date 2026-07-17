@@ -48,6 +48,7 @@ mod tests {
                 role: "user".to_string(),
                 parts: vec![Part {
                     text: Some("Write the first line of a story about a magic backpack.".to_string()),
+                    inline_data: None,
                     thought: None,
                 }],
             },
@@ -55,6 +56,7 @@ mod tests {
                 role: "model".to_string(),
                 parts: vec![Part {
                     text: Some("In the bustling city of Meadow brook, lived a young girl named Sophie. She was a bright and curious soul with an imaginative mind.".to_string()),
+                    inline_data: None,
                     thought: None,
                 }],
             },
@@ -62,6 +64,7 @@ mod tests {
                 role: "user".to_string(),
                 parts: vec![Part {
                     text: Some("Can you set it in a quiet village in 1600s France?".to_string()),
+                    inline_data: None,
                     thought: None,
                 }],
             },

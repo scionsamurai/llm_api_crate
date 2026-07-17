@@ -10,7 +10,7 @@ mod tests {
         let llm: LLM = LLM::OpenAI;
 
         //let res = llm.send_single_message("Hello, can you tell me a joke?", None).await; // Old call
-        let res = llm.send_single_message("Hello, can you tell me a joke?", None, None).await; // New call
+        let res = llm.send_single_message("Hello, can you tell me a joke?".into(), None, None).await; // New call
 
         match res {
             Ok(response) => {

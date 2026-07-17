@@ -8,7 +8,7 @@ use dotenv::dotenv;
 
 use futures::stream::{BoxStream, StreamExt};
 use async_stream::stream;
-use crate::structs::general::{Message, LlmResponse, LlmChunk};
+use crate::structs::general::{Message, LlmResponse, LlmChunk, MessagePart, ImageSource};
 use crate::config::LlmConfig; // <-- Import config
 
 // --- NEW: Added Thinking Config struct ---

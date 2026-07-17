@@ -16,7 +16,7 @@ mod tests {
         let llm = LLM::LlamaServer;
         let prompt = "Explain the Fermi Paradox in one short sentence.";
         
-        let res = llm.send_single_message(prompt, Some(TEST_MODEL), None).await;
+        let res = llm.send_single_message(prompt.into(), Some(TEST_MODEL), None).await;
         
         match res {
             Ok(response) => {
@@ -66,7 +66,7 @@ mod tests {
         // Testing that the config struct serializes properly without crashing the server
         let config = LlmConfig::new();
 
-        let res = llm.send_single_message("What is capital of Japan?", Some(TEST_MODEL), Some(&config)).await;
+        let res = llm.send_single_message("What is capital of Japan?".into(), Some(TEST_MODEL), Some(&config)).await;
         
         match res {
             Ok(response) => {

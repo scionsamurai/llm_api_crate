@@ -46,17 +46,19 @@ impl MessageContent {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ImageSource {
+    Url { url: String },
+    Base64 { media_type: String, data: String },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MessagePart {
     pub r#type: String, // "text" or "image_url"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub image_url: Option<ImageUrl>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ImageUrl {
-    pub url: String,
+    pub image_url: Option<ImageSource>,
 }
 
 // --- New: Enum to handle inconsistent 'thought' types from different models ---
@@ -81,12 +83,20 @@ pub struct Content {
     pub parts: Vec<Part>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct Part {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub thought: Option<ThoughtContent>, // Updated from Option<String>
+    pub inline_data: Option<GeminiInlineData>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thought: Option<ThoughtContent>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GeminiInlineData {
+    pub mime_type: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

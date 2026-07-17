@@ -35,6 +35,7 @@ pub async fn call_gemini_embeddings(
         content: GeminiEmbeddingContent {
             parts: vec![Part {
                 text: Some(text),
+                inline_data: None,
                 thought: None,
             }],
         },

@@ -11,7 +11,7 @@ mod tests {
         let llm: LLM = LLM::Gemini;
 
         // Test without config
-        let res = llm.send_single_message("Hi there, this is a test. Please generate a limerick.", None, None).await;
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limerick.".to_string().into(), None, None).await;
         match res {
             Ok(response) => {
                 println!("Ok: {}", &response.text);
@@ -28,7 +28,7 @@ mod tests {
 
         // Test with config
         let config = LlmConfig::new().with_temperature(0.5);
-        let res = llm.send_single_message("Hi there, this is a test. Please generate a limerick.", None, Some(&config)).await;
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limerick.".to_string().into(), None, Some(&config)).await;
         match res {
             Ok(response) => {
                 println!("Ok with config: {}", &response.text);

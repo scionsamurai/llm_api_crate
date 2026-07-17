@@ -305,6 +305,9 @@ pub async fn call_llama_legacy(
         image_data: None,
     };
 
+    // Extract images if MessageContent is present (for future-proofing/compatibility)
+    // Note: Legacy Llama endpoint is primarily text-based.
+
     if let Some(cfg) = config {
         request_body.n_predict = cfg.max_tokens;
         request_body.temperature = cfg.temperature;

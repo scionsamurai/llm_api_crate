@@ -2,17 +2,31 @@
 use std::env;
 use std::time::Duration;
 use dotenv::dotenv;
-use serde_json::json; // Removed Map, Value
+use serde_json::json;
 
     use futures::stream::{BoxStream, StreamExt};
     use async_stream::stream;
     use crate::errors::{GeneralError, with_retry};
-    use crate::structs::general::{ Message, Content, Part, LlmChunk };
-    use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool};
-use crate::gemini::request::gemini_request;
-use crate::gemini::response::parse_gemini_response;
-use crate::gemini::types::GeminiResponse;
-use crate::config::LlmConfig;
+    use crate::structs::general::{Message, Content, Part, LlmChunk, MessagePart, ImageSource, GeminiInlineData};
+    use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool, GeminiResponse};
+    use crate::gemini::request::gemini_request;
+    use crate::gemini::response::parse_gemini_response;
+    use crate::config::LlmConfig;
+
+fn map_message_parts_to_gemini(parts: Vec<MessagePart>) -> Vec<Part> {
+    parts.into_iter().map(|p| {
+        if p.r#type == "image_url" {
+            if let Some(ImageSource::Base64 { media_type, data }) = p.image_url {
+                return Part { 
+                    text: None, 
+                    inline_data: Some(GeminiInlineData { mime_type: media_type, data }),
+                    thought: None 
+                };
+            }
+        }
+        Part { text: p.text, inline_data: None, thought: None }
+    }).collect()
+}
 
 pub async fn call_gemini(
     messages: Vec<Message>,
@@ -40,6 +54,7 @@ pub async fn call_gemini(
             role: msg.role.clone(),
             parts: vec![Part {
                 text: Some(msg.content.extract_text()),
+                inline_data: None,
                 thought: None,
             }],
         })
@@ -115,7 +130,7 @@ pub async fn call_gemini_stream(
 
     let contents: Vec<Content> = messages.iter().map(|msg| Content {
         role: msg.role.clone(),
-        parts: vec![Part { text: Some(msg.content.extract_text()), thought: None }],
+        parts: vec![Part { text: Some(msg.content.extract_text()), inline_data: None, thought: None }],
     }).collect();
 
     let mut generation_config_option = None;

@@ -10,7 +10,7 @@ mod tests {
         let llm: LLM = LLM::Anthropic;
 
         //let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None).await; // Old call
-        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.", None, None).await; // New call
+        let res = llm.send_single_message("Hi there, this is a test. Please generate a limrik.".into(), None, None).await; // New call
 
         match res {
             Ok(response) => {
