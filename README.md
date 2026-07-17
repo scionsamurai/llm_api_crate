@@ -9,6 +9,7 @@ This crate is used to power an open-source coding assistant currently in active 
 **Recent updates include:**
 - **Streaming Support:** Real-time token streaming for all supported providers.
 - **Unified Reasoning:** Support for "thinking" or "reasoning" blocks from models like OpenAI's `o1`/`o3`, Anthropic's Claude 3.7, and Google's Gemini 2.0 Flash Thinking, available in both blocking and streaming modes.
+- **Multimodal Support:** Support for image inputs via Base64 or URL, allowing text and images to be interleaved in messages.
 
 Development is self-encouraged so updates can be far and few between, open an issue on GitHub if you want something specific.
 
@@ -58,7 +59,7 @@ The `Access` trait defines asynchronous methods for interacting with LLMs:
   ```rust
   async fn send_single_message(
       &self,
-      message: &str,
+      content: MessageContent,
       model: Option<&str>,
       config: Option<&LlmConfig>,
   ) -> Result<LlmResponse, Box<dyn std::error::Error + Send + Sync>>;
@@ -116,6 +117,25 @@ The `Access` trait defines asynchronous methods for interacting with LLMs:
 The `LLM` enum implements `Access`, providing specific implementations for each method based on the chosen LLM provider.
 
 > **Note:** `get_model_info`, `list_models`, and `count_tokens` currently only work for the Gemini LLM. Other providers return an error indicating this functionality is not yet supported.
+
+---
+
+### Multimodal Support
+
+The crate supports multimodal inputs, allowing you to send images alongside text. This is achieved using the `MessageContent::Array` variant, which contains a list of `MessagePart`s.
+
+#### Message Parts
+
+A `MessagePart` can be:
+- **Text**: A standard text block.
+- **Image**: An image provided via a URL or Base64 encoded data.
+
+#### Image Sources
+
+Images are defined using the `ImageSource` enum:
+
+- `Url { url: String }`: A direct link to an image.
+- `Base64 { media_type: String, data: String }`: An image provided as a Base64 encoded string (e.g., `image/jpeg`).
 
 ---
 
@@ -192,7 +212,7 @@ async fn main() {
     let llm = LLM::OpenAI;
 
     // Basic usage
-    let response = llm.send_single_message("Tell me a joke about programmers", None, None).await;
+    let response = llm.send_single_message("Tell me a joke about programmers".into(), None, None).await;
     match response {
         Ok(res) => println!("Response: {}", res.text),
         Err(err) => eprintln!("Error: {}", err),
@@ -201,7 +221,7 @@ async fn main() {
     // With reasoning enabled
     let config = Some(LlmConfig::new().with_thinking_budget(1024));
     let response = llm
-        .send_single_message("How many ping pong balls fit in a bus?", Some("o3-mini"), config.as_ref())
+        .send_single_message("How many ping pong balls fit in a bus?".into(), Some("o3-mini"), config.as_ref())
         .await;
 
     match response {
@@ -211,6 +231,39 @@ async fn main() {
             }
             println!("Final Answer:\n{}", res.text);
         }
+        Err(err) => eprintln!("Error: {}", err),
+    }
+}
+```
+
+### Multimodal Input (Image)
+
+```rust
+use llm_api_access::llm::{Access, LLM};
+use llm_api_access::structs::general::{MessageContent, MessagePart, ImageSource};
+
+#[tokio::main]
+async fn main() {
+    let llm = LLM::Anthropic;
+
+    let content = MessageContent::Array(vec![
+        MessagePart {
+            r#type: "text".to_string(),
+            text: Some("What is in this image?".to_string()),
+            image_url: None,
+        },
+        MessagePart {
+            r#type: "image_url".to_string(),
+            text: None,
+            image_url: Some(ImageSource::Url {
+                url: "https://example.com/image.jpg".to_string(),
+            }),
+        },
+    ]);
+
+    let response = llm.send_single_message(content, None, None).await;
+    match response {
+        Ok(res) => println!("Response: {}", res.text),
         Err(err) => eprintln!("Error: {}", err),
     }
 }
