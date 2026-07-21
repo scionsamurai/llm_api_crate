@@ -76,7 +76,17 @@ impl Serialize for ImageSource {
                 state.serialize_field("url", url)?;
             }
             ImageSource::Base64 { media_type, data } => {
-                let data_uri = format!("data:{};base64,{}", media_type, data);
+                // Strip prefix if present: "data:image/<type>;base64,"
+                let clean_data = if let Some(comma_idx) = data.find(',') {
+                    if data.starts_with("data:image/") && data.contains(";base64") {
+                        &data[comma_idx + 1..]
+                    } else {
+                        data
+                    }
+                } else {
+                    data
+                };
+                let data_uri = format!("data:{};base64,{}", media_type, clean_data);
                 state.serialize_field("url", &data_uri)?;
             }
         }
