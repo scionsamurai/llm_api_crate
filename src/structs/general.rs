@@ -64,6 +64,18 @@ pub enum ImageSource {
     Base64 { media_type: String, data: String },
 }
 
+impl ImageSource {
+    /// Utility to strip "data:image/<type>;base64," prefix from a base64 string.
+    pub fn strip_base64_prefix(data: &str) -> &str {
+        if let Some(comma_idx) = data.find(',') {
+            if data.starts_with("data:image/") && data.contains(";base64") {
+                return &data[comma_idx + 1..];
+            }
+        }
+        data
+    }
+}
+
 impl Serialize for ImageSource {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -76,16 +88,7 @@ impl Serialize for ImageSource {
                 state.serialize_field("url", url)?;
             }
             ImageSource::Base64 { media_type, data } => {
-                // Strip prefix if present: "data:image/<type>;base64,"
-                let clean_data = if let Some(comma_idx) = data.find(',') {
-                    if data.starts_with("data:image/") && data.contains(";base64") {
-                        &data[comma_idx + 1..]
-                    } else {
-                        data
-                    }
-                } else {
-                    data
-                };
+                let clean_data = ImageSource::strip_base64_prefix(data);
                 let data_uri = format!("data:{};base64,{}", media_type, clean_data);
                 state.serialize_field("url", &data_uri)?;
             }

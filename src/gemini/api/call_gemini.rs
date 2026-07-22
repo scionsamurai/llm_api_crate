@@ -17,9 +17,11 @@ pub fn map_message_parts_to_gemini(parts: Vec<MessagePart>) -> Vec<Part> {
     parts.into_iter().map(|p| {
         if p.r#type == "image_url" {
             if let Some(ImageSource::Base64 { media_type, data }) = p.image_url {
+                // Apply the shared strip utility
+                let clean_data = ImageSource::strip_base64_prefix(&data).to_string();
                 return Part { 
                     text: None, 
-                    inline_data: Some(GeminiInlineData { mime_type: media_type, data }),
+                    inline_data: Some(GeminiInlineData { mime_type: media_type, data: clean_data }),
                     thought: None 
                 };
             }
