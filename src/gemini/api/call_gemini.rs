@@ -4,14 +4,51 @@ use std::time::Duration;
 use dotenv::dotenv;
 use serde_json::json;
 
-    use futures::stream::{BoxStream, StreamExt};
-    use async_stream::stream;
-    use crate::errors::{GeneralError, with_retry};
-    use crate::structs::general::{Message, Content, Part, LlmChunk, MessagePart, ImageSource, GeminiInlineData};
-    use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool, GeminiResponse};
-    use crate::gemini::request::gemini_request;
-    use crate::gemini::response::parse_gemini_response;
-    use crate::config::LlmConfig;
+use futures::stream::{BoxStream, StreamExt};
+use async_stream::stream;
+use crate::errors::{GeneralError, RetryPolicy, RetryDecision, with_policy_retry};
+use crate::structs::general::{Message, Content, Part, LlmChunk, MessagePart, ImageSource, GeminiInlineData};
+use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool, GeminiResponse, GeminiErrorResponse};
+use crate::gemini::request::gemini_request;
+use crate::gemini::response::parse_gemini_response;
+use crate::config::LlmConfig;
+
+/// Gemini-aware retry policy for non-conversational Gemini API calls.
+pub struct GeminiCallRetryPolicy {
+    pub max_retries: usize,
+    pub safety_padding: Duration,
+}
+
+impl RetryPolicy<Box<dyn std::error::Error + Send + Sync>> for GeminiCallRetryPolicy {
+    fn should_retry(&self, error: &Box<dyn std::error::Error + Send + Sync>, attempt: usize) -> RetryDecision {
+        if attempt >= self.max_retries {
+            return RetryDecision::Abort;
+        }
+
+        let err_str = error.to_string();
+
+        if let Some(json_start) = err_str.find('{') {
+            let json_part = &err_str[json_start..];
+            if let Ok(error_resp) = serde_json::from_str::<GeminiErrorResponse>(json_part) {
+                if let Some(details) = error_resp.error.details {
+                    for detail in details {
+                        if let Some(delay_str) = detail.retry_delay {
+                            let clean_delay = delay_str.trim_end_matches('s');
+                            if let Ok(secs) = clean_delay.parse::<f64>() {
+                                let suggested_duration = Duration::from_secs_f64(secs);
+                                let total_delay = suggested_duration + self.safety_padding;
+                                return RetryDecision::RetryAfter(total_delay);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let fallback_delay = Duration::from_secs(1) * 2u32.saturating_pow((attempt - 1) as u32);
+        RetryDecision::RetryAfter(fallback_delay)
+    }
+}
 
 pub fn map_message_parts_to_gemini(parts: Vec<MessagePart>) -> Vec<Part> {
     parts.into_iter().map(|p| {
@@ -94,8 +131,13 @@ pub async fn call_gemini(
         tools: tools_option,
     };
 
-    // Wrap the request and parsing logic in with_retry
-    with_retry(|| async {
+    let policy = GeminiCallRetryPolicy {
+        max_retries: 3,
+        safety_padding: Duration::from_secs(2),
+    };
+
+    // Wrap the request and parsing logic in policy-driven retry
+    with_policy_retry(|| async {
         let response = gemini_request(&url, &api_key, &request, None).await?;
         
         if !response.status().is_success() {
@@ -108,7 +150,7 @@ pub async fn call_gemini(
 
         let gemini_response: GeminiResponse = parse_gemini_response(response).await?;
         Ok(gemini_response)
-    }, 3, Duration::from_secs(1)).await
+    }, policy).await
 }
 
 pub async fn call_gemini_stream(

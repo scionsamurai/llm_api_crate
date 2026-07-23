@@ -122,9 +122,11 @@ pub struct GeminiError {
 pub struct GeminiErrorDetail {
     #[serde(rename = "@type")]
     pub type_: String,
-    pub reason: String,
-    pub domain: String,
-    pub metadata: HashMap<String, String>,
+    #[serde(rename = "retryDelay")]
+    pub retry_delay: Option<String>,
+    pub reason: Option<String>,
+    pub domain: Option<String>,
+    pub metadata: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize)]

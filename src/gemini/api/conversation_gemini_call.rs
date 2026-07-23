@@ -5,12 +5,54 @@ use std::time::Duration;
 use dotenv::dotenv;
 use serde_json::json; // Removed Map, Value
 
-use crate::errors::{GeneralError, with_retry};
+use crate::errors::{GeneralError, RetryPolicy, RetryDecision, with_policy_retry};
 use crate::structs::general::Content;
-use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool, GeminiResponse};
+use crate::gemini::types::{GeminiRequest, GenerationConfig, Tool, GeminiResponse, GeminiErrorResponse};
 use crate::gemini::request::gemini_request;
 use crate::gemini::response::parse_gemini_response;
 use crate::config::LlmConfig;
+
+/// Gemini-aware retry policy that parses Google RPC error details (specifically `retryDelay`)
+/// and adds a safety padding (+2s) to prevent immediate secondary quota rejections.
+pub struct GeminiRetryPolicy {
+    pub max_retries: usize,
+    pub safety_padding: Duration,
+}
+
+impl RetryPolicy<Box<dyn std::error::Error + Send + Sync>> for GeminiRetryPolicy {
+    fn should_retry(&self, error: &Box<dyn std::error::Error + Send + Sync>, attempt: usize) -> RetryDecision {
+        if attempt >= self.max_retries {
+            return RetryDecision::Abort;
+        }
+
+        let err_str = error.to_string();
+
+        // Attempt to extract structured Gemini error JSON from the error message string
+        // Error messages typically follow the format: "Gemini API returned error 429 Too Many Requests: { ... }"
+        if let Some(json_start) = err_str.find('{') {
+            let json_part = &err_str[json_start..];
+            if let Ok(error_resp) = serde_json::from_str::<GeminiErrorResponse>(json_part) {
+                if let Some(details) = error_resp.error.details {
+                    for detail in details {
+                        if let Some(delay_str) = detail.retry_delay {
+                            // Parse strings like "16.747818564s" or "16s"
+                            let clean_delay = delay_str.trim_end_matches('s');
+                            if let Ok(secs) = clean_delay.parse::<f64>() {
+                                let suggested_duration = Duration::from_secs_f64(secs);
+                                let total_delay = suggested_duration + self.safety_padding;
+                                return RetryDecision::RetryAfter(total_delay);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback to standard exponential backoff if no structured retryDelay was found
+        let fallback_delay = Duration::from_secs(1) * 2u32.saturating_pow((attempt - 1) as u32);
+        RetryDecision::RetryAfter(fallback_delay)
+    }
+}
 
 pub async fn conversation_gemini_call(
     messages: Vec<Content>,
@@ -71,8 +113,13 @@ pub async fn conversation_gemini_call(
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", HeaderValue::from_static("application/json"));
 
-    // Wrap the request and parsing logic in with_retry
-    with_retry(|| async {
+    let policy = GeminiRetryPolicy {
+        max_retries: 3,
+        safety_padding: Duration::from_secs(2), // Add 2 seconds padding to server-suggested retryDelay
+    };
+
+    // Wrap the request and parsing logic in policy-driven retry
+    with_policy_retry(|| async {
         let response = gemini_request(&url, &api_key, &request, Some(headers.clone())).await?;
         
         if !response.status().is_success() {
@@ -85,5 +132,5 @@ pub async fn conversation_gemini_call(
 
         let gemini_response: GeminiResponse = parse_gemini_response(response).await?;
         Ok(gemini_response)
-    }, 3, Duration::from_secs(1)).await
+    }, policy).await
 }
