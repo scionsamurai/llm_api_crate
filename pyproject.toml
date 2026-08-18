@@ -7,6 +7,7 @@ name = "llm_api_access"
 description = "Unified interface to query popular LLM providers via PyO3"
 readme = "PYTHON_README.md"
 requires-python = ">=3.8"
+dynamic = ["version"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",

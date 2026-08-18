@@ -1,6 +1,6 @@
 # Python Bindings for `llm_api_access`
 
-This package provides a unified interface to query popular LLM providers (OpenAI, Anthropic, Gemini, and LlamaServer) directly from Python via PyO3 bindings.
+This package provides a unified interface to query popular LLM providers (LlamaServer, Gemini, Anthropic, and OpenAI) directly from Python via PyO3 bindings.
 
 ---
 
@@ -26,7 +26,7 @@ maturin develop --features python
 
 ## 2. Environment Variables & `.env` Support
 
-Because the underlying Rust library uses `dotenv`, environment variables can be loaded from a `.env` file. However, when invoking from Python, it is recommended to load your `.env` file explicitly using `python-dotenv` at the very entry point of your Python script to ensure keys like `OPEN_AI_KEY`, `ANTHROPIC_API_KEY`, or `GEMINI_API_KEY` are available in the process environment before calling Rust code.
+Because the underlying Rust library uses `dotenv`, environment variables can be loaded from a `.env` file. When invoking from Python, it is recommended to load your `.env` file explicitly using `python-dotenv` at the very entry point of your script to ensure keys like `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, or `LLAMA_SERVER_URL` are available in the process environment before calling Rust code.
 
 ```bash
 pip install python-dotenv
@@ -34,17 +34,17 @@ pip install python-dotenv
 
 Example `.env` configuration:
 ```env
-OPEN_AI_KEY=your_openai_key_health
-ANTHROPIC_API_KEY=your_anthropic_key_here
-GEMINI_API_KEY=your_gemini_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 LLAMA_SERVER_URL=http://192.168.0.91:8080
+BASE64_DATA=your_base64_encoded_image_string_here
 ```
 
 ---
 
 ## 3. Usage Guide
 
-Here is how to use all available providers in Python:
+Here is how to use the primary providers (LlamaServer and Gemini), along with multi-turn conversations and multimodal message handling in Python:
 
 ```python
 import os
@@ -62,35 +62,27 @@ config = (
 )
 
 # -------------------------------------------------------------------------
-# 1. OpenAI
+# 1. LlamaServer (Local / Custom URL - Primary Target)
 # -------------------------------------------------------------------------
+llama_config = (
+    llm_api_access.LlmConfig()
+    .with_server_url(os.getenv("LLAMA_SERVER_URL", "http://192.168.0.91:8080"))
+    .with_max_tokens(100)
+)
+
 try:
-    openai_client = llm_api_access.LLMClient(llm_api_access.LLMProvider.OpenAI)
-    response = openai_client.send_message(
+    llama_client = llm_api_access.LLMClient(llm_api_access.LLMProvider.LlamaServer)
+    response = llama_client.send_message(
         prompt="Explain quantum computing in one sentence.",
-        model="gpt-4o",
-        config=config
+        model="gemma-4-26b",
+        config=llama_config
     )
-    print("OpenAI Response:", response)
+    print("LlamaServer Response:", response)
 except Exception as e:
-    print("OpenAI Error:", e)
+    print("LlamaServer Error:", e)
 
 # -------------------------------------------------------------------------
-# 2. Anthropic
-# -------------------------------------------------------------------------
-try:
-    anthropic_client = llm_api_access.LLMClient(llm_api_access.LLMProvider.Anthropic)
-    response = anthropic_client.send_message(
-        prompt="Why is the sky blue?",
-        model=None, # Uses default model
-        config=config
-    )
-    print("Anthropic Response:", response)
-except Exception as e:
-    print("Anthropic Error:", e)
-
-# -------------------------------------------------------------------------
-# 3. Gemini
+# 2. Gemini (Secondary Target)
 # -------------------------------------------------------------------------
 try:
     gemini_client = llm_api_access.LLMClient(llm_api_access.LLMProvider.Gemini)
@@ -104,24 +96,39 @@ except Exception as e:
     print("Gemini Error:", e)
 
 # -------------------------------------------------------------------------
-# 4. LlamaServer (Local / Custom URL)
+# 3. Multi-turn Conversation & Multimodal (Images via Base64)
 # -------------------------------------------------------------------------
-llama_config = (
-    llm_api_access.LlmConfig()
-    .with_server_url("http://192.168.0.91:8080")
-    .with_max_tokens(100)
-)
+base64_image = os.getenv("BASE64_DATA")
 
-try:
-    llama_client = llm_api_access.LLMClient(llm_api_access.LLMProvider.LlamaServer)
-    response = llama_client.send_message(
-        prompt="Hello local model!",
-        model=None,
-        config=llama_config
-    )
-    print("LlamaServer Response:", response)
-except Exception as e:
-    print("LlamaServer Error:", e)
+if base64_image and base64_image != "default_base64_value":
+    try:
+        # Construct a multimodal user message with an attached base64 image
+        image_message = llm_api_access.Message(
+            role="user",
+            text="What is in this image? Answer briefly.",
+            image_base64=base64_image,
+            image_media_type="image/png"
+        )
+        
+        # Follow-up message in conversation history
+        follow_up = llm_api_access.Message(
+            role="user",
+            text="Summarize that in 3 words."
+        )
+
+        conversation = [
+            image_message,
+            llm_api_access.Message(role="assistant", text="I see a graphical pattern."),
+            follow_up
+        ]
+
+        client = llm_api_access.LLMClient(llm_api_access.LLMProvider.Gemini)
+        chat_response = client.send_chat(conversation, model=None, config=config)
+        print("Multimodal Chat Response:", chat_response)
+    except Exception as e:
+        print("Multimodal Error:", e)
+else:
+    print("Skipping multimodal example: BASE64_DATA not found in environment.")
 ```
 
 ---

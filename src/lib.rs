@@ -18,7 +18,7 @@ use crate::llm::{LLM, Access};
 #[cfg(feature = "python")]
 use crate::config::LlmConfig;
 #[cfg(feature = "python")]
-use crate::structs::general::{Message, MessageContent, LlmResponse};
+use crate::structs::general::{Message, MessageContent, MessagePart, ImageSource, LlmResponse};
 
 /// Python-exposed wrapper for LlmConfig
 #[cfg(feature = "python")]
@@ -72,7 +72,64 @@ impl From<PyLLMProvider> for LLM {
     }
 }
 
-/// Simple synchronous helper wrapper for Python to run LLM text generation calls easily
+/// Python-exposed wrapper for constructing chat messages and multimodal inputs
+#[cfg(feature = "python")]
+#[pyclass(name = "Message")]
+#[derive(Clone)]
+pub struct PyMessage {
+    pub inner: Message,
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl PyMessage {
+    #[new]
+    #[pyo3(signature = (role, text=None, image_base64=None, image_media_type=None, image_url=None))]
+    fn new(
+        role: String,
+        text: Option<String>,
+        image_base64: Option<String>,
+        image_media_type: Option<String>,
+        image_url: Option<String>,
+    ) -> Self {
+        let mut parts = Vec::new();
+
+        if let Some(t) = text {
+            parts.push(MessagePart {
+                r#type: "text".to_string(),
+                text: Some(t),
+                image_url: None,
+            });
+        }
+
+        if let Some(b64) = image_base64 {
+            let media_type = image_media_type.unwrap_or_else(|| "image/jpeg".to_string());
+            parts.push(MessagePart {
+                r#type: "image_url".to_string(),
+                text: None,
+                image_url: Some(ImageSource::Base64 { media_type, data: b64 }),
+            });
+        } else if let Some(url) = image_url {
+            parts.push(MessagePart {
+                r#type: "image_url".to_string(),
+                text: None,
+                image_url: Some(ImageSource::Url { url }),
+            });
+        }
+
+        let content = if parts.len() == 1 && parts[0].r#type == "text" {
+            MessageContent::Text(parts[0].text.clone().unwrap_or_default())
+        } else {
+            MessageContent::Array(parts)
+        };
+
+        Self {
+            inner: Message { role, content },
+        }
+    }
+}
+
+/// Synchronous client interface for Python to handle single messages, conversations, and multimodal prompts
 #[cfg(feature = "python")]
 #[pyclass(name = "LLMClient")]
 pub struct PyLLMClient {
@@ -87,7 +144,7 @@ impl PyLLMClient {
         Self { provider: provider.into() }
     }
 
-    /// Send a single text message and get back the response text synchronously
+    /// Send a single text message and get back response text
     fn send_message(&self, prompt: String, model: Option<String>, config: Option<PyLlmConfig>) -> PyResult<String> {
         let rt = tokio::runtime::Runtime::new().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
         
@@ -102,14 +159,33 @@ impl PyLLMClient {
             Ok(res.text)
         })
     }
+
+    /// Send a conversation history (`Vec<Message>`) or multimodal prompt bundle
+    fn send_chat(&self, messages: Vec<PyMessage>, model: Option<String>, config: Option<PyLlmConfig>) -> PyResult<String> {
+        let rt = tokio::runtime::Runtime::new().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+        
+        rt.block_on(async {
+            let cfg = config.map(|c| c.inner);
+            let rust_messages: Vec<Message> = messages.into_iter().map(|m| m.inner).collect();
+            
+            let res = self.provider.send_convo_message(
+                rust_messages,
+                model.as_deref(),
+                cfg.as_ref(),
+            ).await.map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+            
+            Ok(res.text)
+        })
+    }
 }
 
-/// Python module entry point, only compiled when the `python` feature is enabled.
+/// Python module entry point
 #[cfg(feature = "python")]
 #[pymodule]
 fn llm_api_access(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyLlmConfig>()?;
     m.add_class::<PyLLMProvider>()?;
+    m.add_class::<PyMessage>()?;
     m.add_class::<PyLLMClient>()?;
     Ok(())
 }
