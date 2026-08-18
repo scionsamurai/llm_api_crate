@@ -73,8 +73,8 @@
         let res = call_gpt(messages, Some("o3-mini"), None).await;
         match res {
             Ok(response) => {
-                println!("--- response text ---\n{}", response.text);
-                println!("--- response reasoning ---\n{:?}", response.reasoning);
+                eprintln!("--- response text ---\n{}", response.text);
+                eprintln!("--- response reasoning ---\n{:?}", response.reasoning);
                 
                 assert!(!response.text.is_empty(), "Response text should not be empty");
                 // We won't strictly assert response.reasoning.is_some() because OpenAI sometimes hides 
@@ -82,7 +82,7 @@
                 // but we verify the response is formed correctly as an LlmResponse.
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 assert!(false, "Call to OpenAI API with reasoning model failed");
             }
         }
@@ -97,7 +97,7 @@
         match res {
             Ok(embedding) => {
                 assert!(!embedding.is_empty(), "Embedding should not be empty");
-                println!("Embedding vector length: {}", embedding.len());
+                eprintln!("Embedding vector length: {}", embedding.len());
                 // Basic sanity check on the embedding vector (length might change with models)
                 assert!(embedding.len() > 100);
             }
@@ -114,7 +114,7 @@
             Ok(embedding) => {
                 assert!(!embedding.is_empty(), "Embedding should not be empty");
                 assert_eq!(embedding.len() as u32, dimensions, "Embedding dimension should match requested dimension");
-                println!("Embedding vector length: {}", embedding.len());
+                eprintln!("Embedding vector length: {}", embedding.len());
             }
             Err(err) => panic!("Failed to get embedding with dimensions: {}", err),
         }
@@ -138,7 +138,7 @@
                 let mut reasoning_text = String::new();
                 let mut received_done = false;
 
-                println!("--- Starting Stream ---");
+                eprintln!("--- Starting Stream ---");
                 while let Some(chunk_result) = stream.next().await {
                     match chunk_result {
                         Ok(chunk) => {
@@ -148,12 +148,12 @@
                                     full_text.push_str(&t);
                                 }
                                 LlmChunk::Reasoning(r) => {
-                                    println!("\n[Reasoning]: {}", r);
+                                    eprintln!("\n[Reasoning]: {}", r);
                                     reasoning_text.push_str(&r);
                                 }
                                 LlmChunk::Done => {
                                     received_done = true;
-                                    println!("\n--- Stream Done ---");
+                                    eprintln!("\n--- Stream Done ---");
                                 }
                             }
                         }
@@ -163,7 +163,7 @@
 
                 assert!(!full_text.is_empty(), "The stream should have returned some text");
                 assert!(received_done, "The stream should have ended with LlmChunk::Done");
-                println!("\nFinal Collected Text: {}", full_text);
+                eprintln!("\nFinal Collected Text: {}", full_text);
             }
             Err(e) => panic!("Failed to initiate streaming call: {}", e),
         }

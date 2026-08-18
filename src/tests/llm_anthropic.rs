@@ -14,11 +14,11 @@ mod tests {
 
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response.text);
+                eprintln!("Ok: {}", &response.text);
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 assert!(false, "Call to Anthropic API failed");
             }
         }
@@ -47,11 +47,11 @@ mod tests {
 
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response.text);
+                eprintln!("Ok: {}", &response.text);
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 assert!(false, "Call to Anthropic API failed");
             }
         }
@@ -78,7 +78,7 @@ mod tests {
                     print!("{}", t);
                     full_text.push_str(&t);
                 }
-                LlmChunk::Reasoning(r) => println!("\n[Reasoning]: {}", r),
+                LlmChunk::Reasoning(r) => eprintln!("\n[Reasoning]: {}", r),
                 LlmChunk::Done => break,
             }
         }

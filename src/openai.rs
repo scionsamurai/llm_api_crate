@@ -223,7 +223,7 @@ pub async fn call_gpt(
         .send()
         .await
         .map_err(|e| {
-            println!("{:?}", e);
+            eprintln!("{:?}", e);
             Box::new(GeneralError {
                 message: format!("Failed to send request to OpenAI Chat Completion API: {}", e),
             }) as Box<dyn std::error::Error + Send + Sync>
@@ -310,7 +310,7 @@ pub async fn get_embedding(
         .send()
         .await
         .map_err(|e| {
-            println!("{:?}", e);
+            eprintln!("{:?}", e);
             Box::new(GeneralError {
                 message: format!("Failed to send request to OpenAI Embeddings API: {}", e),
             }) as Box<dyn std::error::Error + Send + Sync>

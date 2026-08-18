@@ -14,11 +14,11 @@ mod tests {
 
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response.text);
+                eprintln!("Ok: {}", &response.text);
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 assert!(false, "Call to OpenAI API failed");
             }
         }
@@ -48,11 +48,11 @@ mod tests {
 
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response.text);
+                eprintln!("Ok: {}", &response.text);
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 assert!(false, "Call to OpenAI API failed");
             }
         }

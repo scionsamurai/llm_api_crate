@@ -14,14 +14,14 @@ mod tests {
         let res = llm.send_single_message("Hi there, this is a test. Please generate a limerick.".to_string().into(), None, None).await;
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response.text);
+                eprintln!("Ok: {}", &response.text);
                 if let Some(reasoning) = &response.reasoning {
-                    println!("Reasoning: {}", reasoning);
+                    eprintln!("Reasoning: {}", reasoning);
                 }
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 panic!("Call to Gemini API failed: {}", err);
             }
         }
@@ -31,14 +31,14 @@ mod tests {
         let res = llm.send_single_message("Hi there, this is a test. Please generate a limerick.".to_string().into(), None, Some(&config)).await;
         match res {
             Ok(response) => {
-                println!("Ok with config: {}", &response.text);
+                eprintln!("Ok with config: {}", &response.text);
                 if let Some(reasoning) = &response.reasoning {
-                    println!("Reasoning with config: {}", reasoning);
+                    eprintln!("Reasoning with config: {}", reasoning);
                 }
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error with config: {}", err);
+                eprintln!("Error with config: {}", err);
                 panic!("Call to Gemini API with config failed: {}", err);
             }
         }
@@ -66,14 +66,14 @@ mod tests {
         let res = llm.send_convo_message(messages.clone(), None, None).await;
         match res {
             Ok(response) => {
-                println!("Ok: {}", &response.text);
+                eprintln!("Ok: {}", &response.text);
                 if let Some(reasoning) = &response.reasoning {
-                    println!("Reasoning: {}", reasoning);
+                    eprintln!("Reasoning: {}", reasoning);
                 }
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 panic!("Call to Gemini API failed: {}", err);
             }
         }
@@ -83,14 +83,14 @@ mod tests {
         let res = llm.send_convo_message(messages, None, Some(&config)).await;
         match res {
             Ok(response) => {
-                println!("Ok with config: {}", &response.text);
+                eprintln!("Ok with config: {}", &response.text);
                 if let Some(reasoning) = &response.reasoning {
-                    println!("Reasoning with config: {}", reasoning);
+                    eprintln!("Reasoning with config: {}", reasoning);
                 }
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error with config: {}", err);
+                eprintln!("Error with config: {}", err);
                 panic!("Call to Gemini API with config failed: {}", err);
             }
         }
@@ -104,11 +104,11 @@ mod tests {
         let res = llm.get_model_info(&model_name).await;
         match res {
             Ok(model_info) => {
-                println!("Ok: {:?}", &model_info);
+                eprintln!("Ok: {:?}", &model_info);
                 assert_eq!(model_info.name, model_name);
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 panic!("Failed to get model info: {}", err);
             }
         }
@@ -120,11 +120,11 @@ mod tests {
         let res = llm.list_models().await;
         match res {
             Ok(models) => {
-                println!("Ok: {:?}", &models);
+                eprintln!("Ok: {:?}", &models);
                 assert!(!models.is_empty(), "Models list should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 panic!("Failed to list models: {}", err);
             }
         }
@@ -138,11 +138,11 @@ mod tests {
         let res = llm.count_tokens(text, model).await;
         match res {
             Ok(token_count) => {
-                println!("Ok: {}", &token_count);
+                eprintln!("Ok: {}", &token_count);
                 assert!(token_count > 0, "Token count should be greater than zero");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 panic!("Failed to count tokens: {}", err);
             }
         }
@@ -175,7 +175,7 @@ mod tests {
         }];
 
         let res = llm.send_convo_message(messages, None, None).await;
-        println!("Gemini multimodal response: {:?}", res);
+        eprintln!("Gemini multimodal response: {:?}", res);
         assert!(res.is_ok(), "Gemini failed to process multimodal message: {:?}", res.err());
     }
 
@@ -201,7 +201,7 @@ mod tests {
                     print!("{}", t);
                     full_text.push_str(&t);
                 }
-                LlmChunk::Reasoning(r) => println!("\n[Thought]: {}", r),
+                LlmChunk::Reasoning(r) => eprintln!("\n[Thought]: {}", r),
                 LlmChunk::Done => break,
             }
         }
@@ -226,7 +226,7 @@ mod embedding_tests {
         match result {
             Ok(vec) => {
                 assert!(!vec.is_empty(), "Embedding vector should not be empty");
-                println!("Successfully retrieved embedding of length: {}", vec.len());
+                eprintln!("Successfully retrieved embedding of length: {}", vec.len());
             }
             Err(e) => {
                 panic!("Gemini embedding failed: {}", e);
@@ -250,7 +250,7 @@ mod embedding_tests {
                     requested_dims as usize, 
                     "The embedding vector length should match the requested dimensions"
                 );
-                println!("Successfully retrieved dimension-reduced embedding: {}", vec.len());
+                eprintln!("Successfully retrieved dimension-reduced embedding: {}", vec.len());
             }
             Err(e) => {
                 panic!("Gemini dimension-reduced embedding failed: {}", e);

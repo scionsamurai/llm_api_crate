@@ -17,12 +17,12 @@ mod tests {
         let res = call_anthropic(messages, None, None).await;
         match res {
             Ok(response) => {
-                println!("response text: {:}", response.text);
-                println!("response reasoning: {:?}", response.reasoning);
+                eprintln!("response text: {:}", response.text);
+                eprintln!("response reasoning: {:?}", response.reasoning);
                 assert!(!response.text.is_empty(), "Response should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 assert!(false, "Call to Anthropic API failed");
             }
         }
@@ -50,7 +50,7 @@ mod tests {
         match res {
             Ok(response) => {
                 assert!(!response.text.is_empty(), "Response should not be empty");
-                println!("Response1: {}", &response.text);
+                eprintln!("Response1: {}", &response.text);
                 messages.push(Message {
                     role: "assistant".to_string(),
                     content: MessageContent::Text(response.text),
@@ -68,16 +68,16 @@ mod tests {
                 match res {
                     Ok(response) => {
                         assert!(!response.text.is_empty(), "Response should not be empty");
-                        println!("Response2: {}", response.text);
+                        eprintln!("Response2: {}", response.text);
                     }
                     Err(err) => {
-                        println!("Error: {}", err);
+                        eprintln!("Error: {}", err);
                         assert!(false, "Call to Anthropic API failed");
                     }
                 }
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 assert!(false, "Call to Anthropic API failed");
             }
         }
@@ -100,15 +100,15 @@ mod tests {
         let res = call_anthropic(messages, Some("claude-haiku-4-5"), Some(&config)).await;
         match res {
             Ok(response) => {
-                println!("--- response text ---\n{:}", response.text);
-                println!("--- response reasoning ---\n{:?}", response.reasoning);
+                eprintln!("--- response text ---\n{:}", response.text);
+                eprintln!("--- response reasoning ---\n{:?}", response.reasoning);
                 
                 assert!(!response.text.is_empty(), "Response text should not be empty");
                 assert!(response.reasoning.is_some(), "Reasoning block should be populated");
                 assert!(!response.reasoning.unwrap().is_empty(), "Reasoning string should not be empty");
             }
             Err(err) => {
-                println!("Error: {}", err);
+                eprintln!("Error: {}", err);
                 assert!(false, "Call to Anthropic API with thinking failed");
             }
         }

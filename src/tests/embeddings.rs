@@ -11,7 +11,7 @@ mod tests {
     async fn test_openai_embedding_integration() {
         dotenv().ok();
         if env::var("OPEN_AI_KEY").is_err() {
-            println!("Skipping OpenAI embedding test: OPEN_AI_KEY not found.");
+            eprintln!("Skipping OpenAI embedding test: OPEN_AI_KEY not found.");
             return;
         }
 
@@ -43,14 +43,14 @@ mod tests {
         match result {
             Ok(embedding) => {
                 assert!(!embedding.is_empty(), "Llama embedding vector should not be empty");
-                println!("Llama embedding returned vector of length: {}", embedding.len());
+                eprintln!("Llama embedding returned vector of length: {}", embedding.len());
             }
             Err(e) => {
                 let err_msg = e.to_string();
                 // If we get a connection error, it means the server isn't running.
                 // We skip rather than fail so the test suite remains useful in CI.
                 if err_msg.contains("connection refused") || err_msg.contains("Failed to send request") {
-                    println!("Skipping Llama embedding test: No Llama server detected at default URL.");
+                    eprintln!("Skipping Llama embedding test: No Llama server detected at default URL.");
                 } else {
                     panic!("Llama embedding failed with an unexpected error: {}", e);
                 }
@@ -64,7 +64,7 @@ mod tests {
     async fn test_embedding_dimensions_parameter() {
         dotenv().ok();
         if env::var("OPEN_AI_KEY").is_err() {
-            println!("Skipping dimension test: OPEN_AI_KEY not found.");
+            eprintln!("Skipping dimension test: OPEN_AI_KEY not found.");
             return;
         }
 

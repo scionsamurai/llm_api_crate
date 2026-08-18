@@ -21,10 +21,10 @@ mod tests {
         match res {
             Ok(response) => {
                 assert!(!response.text.is_empty(), "Response text should not be empty");
-                println!("Llama Single Message Response:\n{}", response.text);
+                eprintln!("Llama Single Message Response:\n{}", response.text);
                 
                 if let Some(reasoning) = response.reasoning {
-                    println!("Llama Single Message Reasoning:\n{}", reasoning);
+                    eprintln!("Llama Single Message Reasoning:\n{}", reasoning);
                 }
             }
             Err(err) => panic!("Network call to Llama Server failed: {}", err),
@@ -49,10 +49,10 @@ mod tests {
         match res {
             Ok(response) => {
                 assert!(!response.text.is_empty(), "Response text should not be empty");
-                println!("Llama Convo Response:\n{}", response.text);
+                eprintln!("Llama Convo Response:\n{}", response.text);
                 
                 if let Some(reasoning) = response.reasoning {
-                    println!("Llama Convo Reasoning:\n{}", reasoning);
+                    eprintln!("Llama Convo Reasoning:\n{}", reasoning);
                 }
             }
             Err(err) => panic!("Network call to Llama Server failed: {}", err),
@@ -71,8 +71,8 @@ mod tests {
         match res {
             Ok(response) => {
                 assert!(!response.text.is_empty(), "Response text should not be empty");
-                println!("Llama Config Reasoning:\n{:?}", response.reasoning);
-                println!("Llama Config Response:\n{}", response.text);
+                eprintln!("Llama Config Reasoning:\n{:?}", response.reasoning);
+                eprintln!("Llama Config Response:\n{}", response.text);
             }
             Err(err) => panic!("Network call to Llama Server with config failed: {}", err),
         }
@@ -93,9 +93,9 @@ mod tests {
         match res {
             Ok(response) => {
                 assert!(!response.text.is_empty(), "Legacy response should not be empty");
-                println!("Llama Legacy Response Text:\n{}", response.text);
+                eprintln!("Llama Legacy Response Text:\n{}", response.text);
                 if let Some(reasoning) = response.reasoning {
-                     println!("Llama Legacy Reasoning:\n{}", reasoning);
+                     eprintln!("Llama Legacy Reasoning:\n{}", reasoning);
                 }
             }
             Err(err) => panic!("Legacy network call failed: {}", err),
@@ -123,7 +123,7 @@ mod tests {
                     print!("{}", t);
                     full_text.push_str(&t);
                 }
-                LlmChunk::Reasoning(r) => println!("\n[Thinking]: {}", r),
+                LlmChunk::Reasoning(r) => eprintln!("\n[Thinking]: {}", r),
                 LlmChunk::Done => break,
             }
         }
@@ -158,13 +158,13 @@ mod tests {
         }];
 
         let res = llm.send_convo_message(messages, Some(TEST_MODEL), None).await;
-        println!("Llama multimodal response: {:?}", res);
+        eprintln!("Llama multimodal response: {:?}", res);
         match res {
             Ok(response) => {
                 assert!(!response.text.is_empty(), "Llama vision response should not be empty");
             }
             Err(err) => {
-                println!("Llama vision call skipped or failed (expected if model is text-only): {}", err);
+                eprintln!("Llama vision call skipped or failed (expected if model is text-only): {}", err);
             }
         }
     }

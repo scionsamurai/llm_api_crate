@@ -14,7 +14,7 @@ pub async fn parse_gemini_response<T: DeserializeOwned>(
     })?;
 
     serde_json::from_str(&response_body).map_err(|e| {
-        println!("Failed to parse response body: {}", response_body);
+        eprintln!("Failed to parse response body: {}", response_body);
         Box::new(GeneralError {
             message: format!("Failed to parse response from Gemini API 1: {}", e.to_string()),
         }) as Box<dyn std::error::Error + Send + Sync>
@@ -58,8 +58,8 @@ pub fn gemini_to_llm_response(
         }
     }
 
-    // println!("Extracted text from Gemini response: {}", text);
-    // println!("Extracted reasoning from Gemini response: {:#?}", reasoning);
+    // eprintln!("Extracted text from Gemini response: {}", text);
+    // eprintln!("Extracted reasoning from Gemini response: {:#?}", reasoning);
     Ok(LlmResponse { text, reasoning })
 }
 

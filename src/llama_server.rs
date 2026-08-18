@@ -91,7 +91,7 @@ pub async fn call_llama_openai_compat(
             }
         }
     }
-    // println!("Processed Messages for Llama Server:\n{:#?}", processed_messages);
+    // eprintln!("Processed Messages for Llama Server:\n{:#?}", processed_messages);
 
     let mut request_body = ChatCompletion {
         model: model_name, 
@@ -141,7 +141,7 @@ pub async fn call_llama_openai_compat(
             }) as Box<dyn std::error::Error + Send + Sync>);
         }
 
-        // println!("Raw Llama Server Response: {}", rspns_strng);
+        // eprintln!("Raw Llama Server Response: {}", rspns_strng);
 
         match serde_json::from_str::<APIResponse>(&rspns_strng) {
             Ok(api_response) => {
