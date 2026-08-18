@@ -1,9 +1,12 @@
 import os
+from dotenv import load_dotenv
 import llm_api_access
+
+# Load environment variables from .env file explicitly
+load_dotenv()
 
 def test_openai_client():
     print("Testing OpenAI Client...")
-    # Ensure OPEN_AI_KEY is set in your environment or .env
     if not os.getenv("OPEN_AI_KEY"):
         print("Skipping OpenAI test: OPEN_AI_KEY not found in environment.")
         return
@@ -21,7 +24,6 @@ def test_openai_client():
 
 def test_llama_client():
     print("\nTesting LlamaServer Client...")
-    # Optional: configure custom server URL if needed
     config = llm_api_access.LlmConfig()
     config = config.with_server_url("http://192.168.0.91:8080")
 
