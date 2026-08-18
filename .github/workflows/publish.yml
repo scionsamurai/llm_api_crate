@@ -43,12 +43,12 @@ jobs:
         if: steps.compare_versions.outputs.version_changed == 'true'
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Publish to Crates.io
-        if: steps.compare_versions.outputs.version_changed == 'true'
-        run: |
-          cargo publish --token ${CRATES_TOKEN}
-        env:
-          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+      # - name: Publish to Crates.io
+      #   if: steps.compare_versions.outputs.version_changed == 'true'
+      #   run: |
+      #     cargo publish --token ${CRATES_TOKEN}
+      #   env:
+      #     CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
 
       - name: Build and publish to PyPI
         if: steps.compare_versions.outputs.version_changed == 'true'

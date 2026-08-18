@@ -11,7 +11,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 description = "Unified interface to query popular LLM providers via PyO3"
-authors = [{ name = "scionsamurai", email = " scionsamurai@gmail.com" }]
+authors = [{ name = "scionsamurai", email = "scionsamurai@gmail.com" }]
 dependencies = [
     "python-dotenv>=1.0.0",
 ]
