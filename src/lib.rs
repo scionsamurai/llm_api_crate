@@ -52,6 +52,7 @@ impl PyLlmConfig {
 /// Python-exposed wrapper for LLM providers
 #[cfg(feature = "python")]
 #[pyclass(name = "LLMProvider")]
+#[derive(Clone, Copy)]
 pub enum PyLLMProvider {
     OpenAI,
     Gemini,
