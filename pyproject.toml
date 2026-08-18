@@ -4,13 +4,14 @@ build-backend = "maturin"
 
 [project]
 name = "llm_api_access"
+description = "Unified interface to query popular LLM providers via PyO3"
+readme = "PYTHON_README.md"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3",
 ]
-description = "Unified interface to query popular LLM providers"
 dependencies = [
     "python-dotenv>=1.0.0",
 ]

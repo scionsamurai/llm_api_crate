@@ -1,12 +1,18 @@
 # Python Bindings for `llm_api_access`
 
-This crate provides a unified interface to query popular LLM providers (OpenAI, Anthropic, Gemini, and LlamaServer) directly from Python via PyO3 bindings.
+This package provides a unified interface to query popular LLM providers (OpenAI, Anthropic, Gemini, and LlamaServer) directly from Python via PyO3 bindings.
 
 ---
 
-## 1. Installation & Build
+## 1. Installation
 
-To build and install the package into your Python virtual environment using `maturin`:
+### From PyPI (Recommended for users)
+```bash
+pip install llm_api_access
+```
+
+### For Local Development / Building from Source
+If you are modifying the Rust core or building from source:
 
 ```bash
 # Ensure maturin is installed in your virtual environment
@@ -28,7 +34,7 @@ pip install python-dotenv
 
 Example `.env` configuration:
 ```env
-OPEN_AI_KEY=your_openai_key_here
+OPEN_AI_KEY=your_openai_key_health
 ANTHROPIC_API_KEY=your_anthropic_key_here
 GEMINI_API_KEY=your_gemini_key_here
 LLAMA_SERVER_URL=http://192.168.0.91:8080
