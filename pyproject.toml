@@ -10,12 +10,13 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3",
 ]
-description = "Unified interface to query popular LLM providers via PyO3"
-authors = [{ name = "scionsamurai", email = "scionsamurai@gmail.com" }]
+description = "Unified interface to query popular LLM providers"
 dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
 [tool.maturin]
+# Tells maturin to pull the version (and other metadata) straight from Cargo.toml
+manifest-path = "Cargo.toml"
 features = ["python"]
 module-name = "llm_api_access"
