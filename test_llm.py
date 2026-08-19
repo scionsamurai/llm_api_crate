@@ -15,7 +15,6 @@ def test_llama_client():
 
     client = llm_api_access.LLMClient(llm_api_access.LLMProvider.LlamaServer)
     try:
-        # Note: adjust model name to match your local running LlamaServer model if needed
         response = client.send_message("Say 'Hello from Python via LlamaServer!'", model="gemma-4-26b", config=config)
         print(f"LlamaServer Response: {response}")
     except Exception as e:
@@ -40,57 +39,60 @@ def test_gemini_client():
     except Exception as e:
         print(f"Gemini Error: {e}")
 
-def test_multimodal_and_convo():
-    print("\nTesting Multimodal & Conversation History via LlamaServer / Gemini...")
+def test_three_turn_conversation_and_multimodal():
+    print("\nTesting 3-Turn Conversation & Multimodal History via LlamaServer / Gemini...")
     
     base64_data = os.getenv("BASE64_DATA")
     if not base64_data or base64_data == "default_base64_value":
         print("Skipping Multimodal test: Valid BASE64_DATA environment variable not found.")
         return
 
-    # Create a multimodal message using the exposed PyMessage class
-    image_message = llm_api_access.Message(
+    # Construct strict alternating turns using ONLY 'user' and 'model' roles
+    # Turn 1: User sends image with text prompt
+    turn_1_user = llm_api_access.Message(
         role="user",
         text="What do you see in this attached test image? Answer briefly.",
         image_base64=base64_data,
         image_media_type="image/png"
     )
 
-    # Create follow-up conversation messages
-    follow_up_message = llm_api_access.Message(
-        role="user",
-        text="Now, summarize your previous observation in exactly 3 words."
+    # Turn 2: Model replies
+    turn_2_model = llm_api_access.Message(
+        role="model",
+        text="I see a geometric test pattern rendered in grayscale."
     )
 
-    convo = [
-        image_message,
-        llm_api_access.Message(role="assistant", text="I see a test pattern or graphic in the image."),
-        follow_up_message
-    ]
+    # Turn 3: User follows up
+    turn_3_user = llm_api_access.Message(
+        role="user",
+        text="Now, summarize that description in exactly 3 words."
+    )
 
-    # Try testing multimodal against local LlamaServer first
+    convo = [turn_1_user, turn_2_model, turn_3_user]
+
+    # Test against local LlamaServer first
     try:
-        print("Sending multi-turn conversation with image payload to LlamaServer...")
+        print("Sending 3-turn conversation with image payload to LlamaServer...")
         client = llm_api_access.LLMClient(llm_api_access.LLMProvider.LlamaServer)
         config = llm_api_access.LlmConfig().with_server_url(os.getenv("LLAMA_SERVER_URL", "http://192.168.0.91:8080"))
         response = client.send_chat(convo, model="gemma-4-26b", config=config)
-        print(f"LlamaServer Chat Response: {response}")
+        print(f"LlamaServer 3-Turn Chat Response: {response}")
     except Exception as e:
-        print(f"LlamaServer Multimodal Chat skipped or failed: {e}")
+        print(f"LlamaServer 3-Turn Chat skipped or failed: {e}")
 
-    # Fallback / secondary multimodal test with Gemini if key exists
+    # Fallback / secondary test with Gemini if key exists
     if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
         try:
-            print("Sending multi-turn conversation with image payload to Gemini...")
+            print("Sending 3-turn conversation with image payload to Gemini...")
             client = llm_api_access.LLMClient(llm_api_access.LLMProvider.Gemini)
             response = client.send_chat(convo, model=None)
-            print(f"Gemini Chat Response: {response}")
+            print(f"Gemini 3-Turn Chat Response: {response}")
         except Exception as e:
-            print(f"Gemini Multimodal Chat Error: {e}")
+            print(f"Gemini 3-Turn Chat Error: {e}")
 
 if __name__ == "__main__":
-    print("--- Starting Python LLM Binding Tests (Llama & Gemini Focus) ---")
+    print("--- Starting Python LLM Binding Tests (3-Turn & Multimodal) ---")
     test_llama_client()
     test_gemini_client()
-    test_multimodal_and_convo()
+    test_three_turn_conversation_and_multimodal()
     print("--- Tests Complete ---")

@@ -127,6 +127,49 @@ impl PyMessage {
             inner: Message { role, content },
         }
     }
+
+    /// Expose 'role' attribute to Python
+    #[getter]
+    fn role(&self) -> String {
+        self.inner.role.clone()
+    }
+
+    /// Expose 'text' attribute to Python (extracts text from Text or Array variants)
+    #[getter]
+    fn text(&self) -> String {
+        match &self.inner.content {
+            MessageContent::Text(t) => t.clone(),
+            MessageContent::Array(parts) => {
+                parts.iter()
+                    .filter_map(|p| p.text.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            }
+        }
+    }
+
+    /// Expose whether the message has multimodal parts
+    #[getter]
+    fn is_multimodal(&self) -> bool {
+        matches!(&self.inner.content, MessageContent::Array(_))
+    }
+
+    /// Expose a list of image descriptions or sources present in the message
+    #[getter]
+    fn image_sources(&self) -> Vec<String> {
+        match &self.inner.content {
+            MessageContent::Array(parts) => {
+                parts.iter().filter_map(|p| {
+                    match &p.image_url {
+                        Some(ImageSource::Url { url }) => Some(format!("url:{}", url)),
+                        Some(ImageSource::Base64 { media_type, .. }) => Some(format!("base64:{}", media_type)),
+                        None => None,
+                    }
+                }).collect()
+            }
+            _ => vec![],
+        }
+    }
 }
 
 /// Synchronous client interface for Python to handle single messages, conversations, and multimodal prompts
