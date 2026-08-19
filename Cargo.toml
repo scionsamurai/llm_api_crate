@@ -2,13 +2,13 @@
 name = "llm_api_access"
 description = "A package to query popular LLMs"
 license = "MIT OR Apache-2.0"
-version = "0.1.53"
+version = "0.1.54"
 edition = "2021"
 repository = "https://github.com/scionsamurai/llm_api_crate"
 
 [lib]
 name = "llm_api_access"
-crate-type = ["lib", "cdylib", "rlib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
