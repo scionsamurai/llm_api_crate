@@ -52,7 +52,8 @@ pub struct AnthropicResult {
 #[derive(Debug, Serialize, Clone)]
 pub struct AnthropicRequest {
     pub model: String,
-    pub max_tokens: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<usize>,
     pub messages: Vec<AnthropicMessage>,
     pub stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -195,7 +196,7 @@ pub async fn call_anthropic(
 
     let mut request = AnthropicRequest {
         model: model.unwrap_or(MODEL).to_string(),
-        max_tokens: DEFAULT_MAX_TOKENS,
+        max_tokens: None,
         messages: anthropic_messages,
         stream: false,
         thinking: None,
@@ -204,7 +205,7 @@ pub async fn call_anthropic(
 
     if let Some(cfg) = config {
         if let Some(max_t) = cfg.max_tokens {
-            request.max_tokens = max_t as usize;
+            request.max_tokens = Some(max_t as usize);
         }
 
         if let Some(budget) = cfg.thinking_budget {
@@ -215,12 +216,19 @@ pub async fn call_anthropic(
                 budget_tokens: valid_budget,
             });
 
-            if request.max_tokens <= valid_budget {
-                request.max_tokens = valid_budget + 1024; 
+            let current_max = request.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
+            if current_max <= valid_budget {
+                request.max_tokens = Some(valid_budget + 1024); 
+            } else if request.max_tokens.is_none() {
+                request.max_tokens = Some(valid_budget + 4096);
             }
         } else if let Some(temp) = cfg.temperature {
             request.temperature = Some(temp as f32);
         }
+    }
+
+    if request.max_tokens.is_none() {
+        request.max_tokens = Some(DEFAULT_MAX_TOKENS);
     }
 
     let res = client
@@ -290,7 +298,7 @@ pub async fn call_anthropic_stream(
 
     let mut request = AnthropicRequest {
         model: model.unwrap_or(MODEL).to_string(),
-        max_tokens: DEFAULT_MAX_TOKENS,
+        max_tokens: None,
         messages: anthropic_messages,
         stream: true,
         thinking: None,
@@ -298,14 +306,25 @@ pub async fn call_anthropic_stream(
     };
 
     if let Some(cfg) = config {
-        if let Some(max_t) = cfg.max_tokens { request.max_tokens = max_t as usize; }
+        if let Some(max_t) = cfg.max_tokens { 
+            request.max_tokens = Some(max_t as usize); 
+        }
         if let Some(budget) = cfg.thinking_budget {
             let valid_budget = if budget < 1024 { 1024 } else { budget as usize };
             request.thinking = Some(ThinkingConfig { r#type: "enabled".to_string(), budget_tokens: valid_budget });
-            if request.max_tokens <= valid_budget { request.max_tokens = valid_budget + 1024; }
+            let current_max = request.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
+            if current_max <= valid_budget { 
+                request.max_tokens = Some(valid_budget + 1024); 
+            } else if request.max_tokens.is_none() {
+                request.max_tokens = Some(valid_budget + 4096);
+            }
         } else if let Some(temp) = cfg.temperature {
             request.temperature = Some(temp as f32);
         }
+    }
+
+    if request.max_tokens.is_none() {
+        request.max_tokens = Some(DEFAULT_MAX_TOKENS);
     }
 
     let res = client.post(url).json(&request).send().await?;
