@@ -70,7 +70,7 @@ pub struct AnthropicResponse {
 }
 
 const MODEL: &str = "claude-haiku-4-5";
-const DEFAULT_MAX_TOKENS: usize = 4096;
+const DEFAULT_MAX_TOKENS: usize = 64000;
 
 use std::str;
 
