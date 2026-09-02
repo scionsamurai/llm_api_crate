@@ -185,6 +185,7 @@ pub async fn call_anthropic(
 
     let client = Client::builder()
         .default_headers(headers)
+        .timeout(std::time::Duration::from_secs(300))
         .build()
         .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
             Box::new(GeneralError {
@@ -292,7 +293,10 @@ pub async fn call_anthropic_stream(
     headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
     headers.insert("content-type", HeaderValue::from_static("application/json"));
 
-    let client = Client::builder().default_headers(headers).build()?;
+    let client = Client::builder()
+        .default_headers(headers)
+        .timeout(std::time::Duration::from_secs(300))
+        .build()?;
 
     let anthropic_messages = map_to_anthropic_messages(messages);
 
