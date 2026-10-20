@@ -3,10 +3,11 @@ use reqwest::Client;
 use std::env;
 use std::time::Duration;
 use dotenv::dotenv;
+use serde::Deserialize;
 
 use futures::stream::{BoxStream, StreamExt};
 use async_stream::stream;
-use crate::errors::{GeneralError, with_retry};
+use crate::errors::{GeneralError, with_retry, with_policy_retry, LlmError, LlmErrorKind, LlmRetryPolicy, MAX_RETRY_DELAY};
 use crate::structs::general::{ Message, MessageContent, LlmResponse, LlmChunk };
 use crate::structs::openai::{ChatCompletion, EmbeddingRequest};
 use crate::openai::StreamResponse;
@@ -14,6 +15,78 @@ use crate::models::openai::{APIResponse, ErrorResponse, EmbeddingResponse};
 use crate::structs::llama_server::{LlamaCompletionRequest, LlamaCompletionResponse};
     
 use crate::config::LlmConfig;
+
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
+const DEFAULT_MAX_ATTEMPTS: usize = 3;
+const DEFAULT_RETRY_DELAY: Duration = Duration::from_secs(1);
+
+/// llama-server error bodies are not always OpenAI-shaped (`code` may be an integer).
+#[derive(Deserialize)]
+struct LooseError { error: LooseErrorBody }
+#[derive(Deserialize)]
+struct LooseErrorBody { message: String }
+
+type BoxErr = Box<dyn std::error::Error + Send + Sync>;
+
+fn build_client(config: Option<&LlmConfig>) -> Result<Client, BoxErr> {
+    let connect = config.and_then(|c| c.connect_timeout).unwrap_or(DEFAULT_CONNECT_TIMEOUT);
+    let total = config.and_then(|c| c.request_timeout).unwrap_or(DEFAULT_REQUEST_TIMEOUT);
+    Client::builder()
+        .connect_timeout(connect)
+        .timeout(total)
+        .build()
+        .map_err(|e| Box::new(LlmError::new(LlmErrorKind::Transport, format!("could not build HTTP client: {e}"))) as BoxErr)
+}
+
+fn retry_policy(config: Option<&LlmConfig>) -> LlmRetryPolicy {
+    LlmRetryPolicy {
+        max_attempts: config.and_then(|c| c.max_attempts).unwrap_or(DEFAULT_MAX_ATTEMPTS).max(1),
+        initial_delay: config.and_then(|c| c.retry_initial_delay).unwrap_or(DEFAULT_RETRY_DELAY),
+        max_delay: MAX_RETRY_DELAY,
+    }
+}
+
+async fn post_json<B: serde::Serialize>(client: &Client, url: &str, body: &B, what: &str) -> Result<String, LlmError> {
+    let res = client.post(url).json(body).send().await
+        .map_err(|e| LlmError::from_reqwest(&format!("{what} request"), &e))?;
+    let status = res.status();
+    let retry_after = res.headers().get(reqwest::header::RETRY_AFTER)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.trim().parse::<u64>().ok())
+        .map(Duration::from_secs);
+    let text = res.text().await
+        .map_err(|e| LlmError::from_reqwest(&format!("{what} response body"), &e))?;
+    if !status.is_success() {
+        return Err(LlmError::http(status.as_u16(), retry_after, &text));
+    }
+    Ok(text)
+}
+
+fn parse_chat_response(text: &str) -> Result<LlmResponse, LlmError> {
+    match serde_json::from_str::<APIResponse>(text) {
+        Ok(api) => {
+            let Some(choice) = api.choices.first() else {
+                return Err(LlmError::new(LlmErrorKind::Empty, "Llama Server returned no choices"));
+            };
+            let message = &choice.message;
+            let raw_text = &message.content;
+            let (final_text, final_reasoning) = if let Some(reasoning) = &message.reasoning_content {
+                (raw_text.clone(), Some(reasoning.clone()))
+            } else {
+                parse_raw_reasoning(raw_text)
+            };
+            Ok(LlmResponse { text: final_text, reasoning: final_reasoning })
+        }
+        Err(parse_err) => Err(match serde_json::from_str::<LooseError>(text) {
+            Ok(e) => LlmError::new(LlmErrorKind::Malformed, format!("Llama Server API error: {}", e.error.message)),
+            Err(_) => LlmError::new(
+                LlmErrorKind::Malformed,
+                format!("unparseable Llama Server response: {parse_err}; body: {}", crate::errors::clip(text, 400)),
+            ),
+        }),
+    }
+}
 
 fn get_server_url() -> String {
     dotenv().ok(); 
@@ -118,60 +191,17 @@ pub async fn call_llama_openai_compat(
         request_body.response_format = cfg.json_schema.clone();
     }
 
-    let client = Client::new();
+    let client = build_client(config)?;
 
-    with_retry(|| async {
-        let res = client
-            .post(&url)
-            .json(&request_body)
-            .send()
-            .await
-            .map_err(|e| {
-                Box::new(GeneralError {
-                    message: format!("Failed to send request to Llama Server: {}", e),
-                }) as Box<dyn std::error::Error + Send + Sync>
-            })?;
-
-        let status = res.status();
-        let rspns_strng = res.text().await.unwrap_or_default();
-
-        if !status.is_success() {
-            return Err(Box::new(GeneralError {
-                message: format!("Llama Server returned HTTP {}: {}", status, rspns_strng),
-            }) as Box<dyn std::error::Error + Send + Sync>);
-        }
-
-        // eprintln!("Raw Llama Server Response: {}", rspns_strng);
-
-        match serde_json::from_str::<APIResponse>(&rspns_strng) {
-            Ok(api_response) => {
-                let message = &api_response.choices[0].message;
-                let raw_text = &message.content;
-                
-                // If the server native-parsed it, use it. Otherwise, run our manual fallback parser!
-                let (final_text, final_reasoning) = if let Some(reasoning) = &message.reasoning_content {
-                    (raw_text.clone(), Some(reasoning.clone()))
-                } else {
-                    parse_raw_reasoning(raw_text)
-                };
-
-                Ok(LlmResponse { 
-                    text: final_text, 
-                    reasoning: final_reasoning 
-                })
-            },
-            Err(_) => {
-                match serde_json::from_str::<ErrorResponse>(&rspns_strng) {
-                    Ok(err) => Err(Box::new(GeneralError {
-                        message: format!("Llama Server API Error: {}", err.error.message),
-                    }) as Box<dyn std::error::Error + Send + Sync>),
-                    Err(e) => Err(Box::new(GeneralError {
-                        message: format!("Failed to parse JSON response: {} - Raw: {}", e, rspns_strng),
-                    }) as Box<dyn std::error::Error + Send + Sync>),
-                }
-            }
-        }
-    }, 3, Duration::from_secs(1)).await
+    with_policy_retry(
+        || async {
+            let text = post_json(&client, &url, &request_body, "Llama Server").await
+                .map_err(|e| Box::new(e) as BoxErr)?;
+            parse_chat_response(&text).map_err(|e| Box::new(e) as BoxErr)
+        },
+        retry_policy(config),
+    )
+    .await
 }
 
 pub async fn call_llama_stream(

@@ -199,6 +199,71 @@ LLAMA_SERVER_URL=http://127.0.0.1:8080
 
 ---
 
+## Structured Output & Tool Calling (Llama Server / OpenAI)
+
+You can enforce structured outputs (such as JSON schemas for tool calling) by passing a custom JSON schema via `LlmConfig::with_json_schema`. 
+
+The crate does not execute tools automatically; instead, it returns the structured JSON response, leaving your application free to parse the output and execute the requested tools.
+
+### Example: Tool Calling with Llama Server
+
+```rust
+use llm_api_access::llm::{Access, LLM};
+use llm_api_access::config::LlmConfig;
+use serde_json::json;
+
+#[tokio::main]
+async fn main() {
+    let llm = LLM::LlamaServer;
+
+    // 1. Define your tool schema (compatible with llama-server response_format)
+    let tool_schema = json!({
+        "type": "json_object",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "thought": { "type": "string", "description": "Reasoning before choosing a tool." },
+                "tool_calls": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": { 
+                                "type": "string",
+                                "enum": ["get_weather", "read_file"] 
+                            },
+                            "arguments": { "type": "object" }
+                        },
+                        "required": ["name", "arguments"]
+                    }
+                }
+            },
+            "required": ["thought", "tool_calls"]
+        }
+    });
+
+    let config = LlmConfig::new().with_json_schema(tool_schema);
+
+    // 2. Send the message
+    let response = llm.send_single_message(
+        "Check the weather in Tokyo".into(), 
+        Some("gemma-4-26b"), 
+        Some(&config)
+    ).await.unwrap();
+
+    println!("Response Text (JSON String): \n{}", response.text);
+    if let Some(reasoning) = response.reasoning {
+        println!("Reasoning: \n{}", reasoning);
+    }
+
+    // 3. Your app parses response.text and handles tool execution here:
+    // let parsed: serde_json::Value = serde_json::from_str(&response.text).unwrap();
+    // match parsed["tool_calls"][0]["name"].as_str() { ... }
+}
+```
+
+---
+
 ## Example Usage
 
 ### `send_single_message` with Reasoning

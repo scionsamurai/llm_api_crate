@@ -97,3 +97,99 @@ where
         }
     }
 }
+
+use std::error::Error as StdError;
+
+/// Upper bound on any single backoff sleep, including a server's Retry-After.
+pub const MAX_RETRY_DELAY: Duration = Duration::from_secs(30);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LlmErrorKind {
+    /// A per-attempt timeout (connect + request + body) elapsed.
+    Timeout,
+    /// Could not connect (refused, DNS, unreachable).
+    Connect,
+    /// The connection broke after it was established.
+    Transport,
+    /// The server answered with a non-success status.
+    Http,
+    /// A success response carried no choices.
+    Empty,
+    /// A success response could not be understood.
+    Malformed,
+}
+
+/// Typed transport failure. Boxed into the `Access` error type, so callers can
+/// `downcast_ref::<LlmError>()` instead of parsing messages.
+#[derive(Debug, Clone)]
+pub struct LlmError {
+    pub kind: LlmErrorKind,
+    pub status: Option<u16>,
+    pub retry_after: Option<Duration>,
+    pub message: String,
+}
+
+pub(crate) fn clip(s: &str, max_chars: usize) -> String {
+    s.chars().take(max_chars).collect()
+}
+
+impl LlmError {
+    pub fn new(kind: LlmErrorKind, message: impl Into<String>) -> Self {
+        Self { kind, status: None, retry_after: None, message: message.into() }
+    }
+
+    pub fn http(status: u16, retry_after: Option<Duration>, body: &str) -> Self {
+        Self {
+            kind: LlmErrorKind::Http,
+            status: Some(status),
+            retry_after,
+            message: format!("HTTP {status}: {}", clip(body.trim(), 400)),
+        }
+    }
+
+    pub fn from_reqwest(context: &str, e: &reqwest::Error) -> Self {
+        let kind = if e.is_timeout() {
+            LlmErrorKind::Timeout
+        } else if e.is_connect() {
+            LlmErrorKind::Connect
+        } else {
+            LlmErrorKind::Transport
+        };
+        Self::new(kind, format!("{context}: {e}"))
+    }
+
+    /// Whether repeating the same request can plausibly succeed.
+    pub fn is_retryable(&self) -> bool {
+        match self.kind {
+            LlmErrorKind::Timeout | LlmErrorKind::Connect | LlmErrorKind::Transport => true,
+            LlmErrorKind::Http => matches!(self.status, Some(408 | 425 | 429 | 500 | 502 | 503 | 504)),
+            LlmErrorKind::Empty | LlmErrorKind::Malformed => false,
+        }
+    }
+}
+
+impl fmt::Display for LlmError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+impl StdError for LlmError {}
+
+/// Retries only errors that are `LlmError::is_retryable`, at most
+/// `max_attempts` attempts in total, honouring Retry-After (capped).
+pub struct LlmRetryPolicy {
+    pub max_attempts: usize,
+    pub initial_delay: Duration,
+    pub max_delay: Duration,
+}
+
+impl RetryPolicy<Box<dyn StdError + Send + Sync>> for LlmRetryPolicy {
+    fn should_retry(&self, error: &Box<dyn StdError + Send + Sync>, attempt: usize) -> RetryDecision {
+        let Some(e) = error.downcast_ref::<LlmError>() else { return RetryDecision::Abort };
+        if !e.is_retryable() || attempt >= self.max_attempts {
+            return RetryDecision::Abort;
+        }
+        let backoff = self.initial_delay.saturating_mul(2u32.saturating_pow((attempt - 1) as u32));
+        RetryDecision::RetryAfter(e.retry_after.unwrap_or(backoff).min(self.max_delay))
+    }
+}

@@ -1,5 +1,6 @@
 // src/config.rs
 use serde_json::Value;
+use std::time::Duration;
 
 #[derive(Debug, Clone, Default)]
 pub struct LlmConfig {
@@ -7,6 +8,11 @@ pub struct LlmConfig {
     pub thinking_budget: Option<i32>,
     pub grounding_with_search: Option<bool>,
     pub server_url: Option<String>,
+
+    pub connect_timeout: Option<Duration>,
+    pub request_timeout: Option<Duration>,
+    pub max_attempts: Option<usize>,
+    pub retry_initial_delay: Option<Duration>,
 
     // --- New llama-server / Universal Parameters ---
     
@@ -80,4 +86,9 @@ impl LlmConfig {
         self.top_p = Some(top_p);
         self
     }
+
+    pub fn with_connect_timeout(mut self, d: Duration) -> Self { self.connect_timeout = Some(d); self }
+    pub fn with_request_timeout(mut self, d: Duration) -> Self { self.request_timeout = Some(d); self }
+    pub fn with_max_attempts(mut self, n: usize) -> Self { self.max_attempts = Some(n); self }
+    pub fn with_retry_initial_delay(mut self, d: Duration) -> Self { self.retry_initial_delay = Some(d); self }
 }
