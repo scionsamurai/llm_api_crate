@@ -39,6 +39,12 @@ impl RetryPolicy<Box<dyn std::error::Error + Send + Sync>> for GeminiRetryPolicy
                             let clean_delay = delay_str.trim_end_matches('s');
                             if let Ok(secs) = clean_delay.parse::<f64>() {
                                 let suggested_duration = Duration::from_secs_f64(secs);
+                                
+                                // Treat retry delays greater than 60 seconds as a failure (abort)
+                                if suggested_duration > Duration::from_secs(60) {
+                                    return RetryDecision::Abort;
+                                }
+
                                 let total_delay = suggested_duration + self.safety_padding;
                                 return RetryDecision::RetryAfter(total_delay);
                             }
@@ -50,6 +56,9 @@ impl RetryPolicy<Box<dyn std::error::Error + Send + Sync>> for GeminiRetryPolicy
 
         // Fallback to standard exponential backoff if no structured retryDelay was found
         let fallback_delay = Duration::from_secs(1) * 2u32.saturating_pow((attempt - 1) as u32);
+        if fallback_delay > Duration::from_secs(60) {
+            return RetryDecision::Abort;
+        }
         RetryDecision::RetryAfter(fallback_delay)
     }
 }
